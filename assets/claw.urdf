@@ -1,6 +1,19 @@
 <!-- claw.urdf -->
 <robot name="planar_claw" version="1.2">
 
+    <!-- Link colours -->
+    <material name="link_1_colour">
+        <color rgba="0.20 0.45 0.90 1"/>
+    </material>
+
+    <material name="link_2_colour">
+        <color rgba="0.20 0.75 0.35 1"/>
+    </material>
+
+    <material name="link_3_colour">
+        <color rgba="0.95 0.55 0.20 1"/>
+    </material>
+
     <!-- Both fingers of the claw have the same fixed base -->
     <link name="base_link"/>
 
@@ -18,17 +31,29 @@
     <link name="left_link_1">
         <visual>
             <origin xyz="-0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
+            <material name="link_1_colour"/>
         </visual>
+
         <collision>
             <origin xyz="-0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
         </collision>
+
         <inertial>
             <origin xyz="-0.05 0 0"/>
             <mass value="0.06"/>
-            <inertia ixx="0.000004" ixy="0" ixz="0"
-                     iyy="0.000052" iyz="0" izz="0.000052"/>
+            <inertia
+                ixx="0.000004"
+                ixy="0"
+                ixz="0"
+                iyy="0.000052"
+                iyz="0"
+                izz="0.000052"/>
         </inertial>
     </link>
 
@@ -44,17 +69,29 @@
     <link name="left_link_2">
         <visual>
             <origin xyz="-0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
+            <material name="link_2_colour"/>
         </visual>
+
         <collision>
             <origin xyz="-0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
         </collision>
+
         <inertial>
             <origin xyz="-0.05 0 0"/>
             <mass value="0.06"/>
-            <inertia ixx="0.000004" ixy="0" ixz="0"
-                     iyy="0.000052" iyz="0" izz="0.000052"/>
+            <inertia
+                ixx="0.000004"
+                ixy="0"
+                ixz="0"
+                iyy="0.000052"
+                iyz="0"
+                izz="0.000052"/>
         </inertial>
     </link>
 
@@ -70,17 +107,29 @@
     <link name="left_link_3">
         <visual>
             <origin xyz="-0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
+            <material name="link_3_colour"/>
         </visual>
+
         <collision>
             <origin xyz="-0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
         </collision>
+
         <inertial>
             <origin xyz="-0.05 0 0"/>
             <mass value="0.06"/>
-            <inertia ixx="0.000004" ixy="0" ixz="0"
-                     iyy="0.000052" iyz="0" izz="0.000052"/>
+            <inertia
+                ixx="0.000004"
+                ixy="0"
+                ixz="0"
+                iyy="0.000052"
+                iyz="0"
+                izz="0.000052"/>
         </inertial>
     </link>
 
@@ -98,17 +147,29 @@
     <link name="right_link_1">
         <visual>
             <origin xyz="0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
+            <material name="link_1_colour"/>
         </visual>
+
         <collision>
             <origin xyz="0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
         </collision>
+
         <inertial>
             <origin xyz="0.05 0 0"/>
             <mass value="0.06"/>
-            <inertia ixx="0.000004" ixy="0" ixz="0"
-                     iyy="0.000052" iyz="0" izz="0.000052"/>
+            <inertia
+                ixx="0.000004"
+                ixy="0"
+                ixz="0"
+                iyy="0.000052"
+                iyz="0"
+                izz="0.000052"/>
         </inertial>
     </link>
 
@@ -124,17 +185,29 @@
     <link name="right_link_2">
         <visual>
             <origin xyz="0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
+            <material name="link_2_colour"/>
         </visual>
+
         <collision>
             <origin xyz="0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
         </collision>
+
         <inertial>
             <origin xyz="0.05 0 0"/>
             <mass value="0.06"/>
-            <inertia ixx="0.000004" ixy="0" ixz="0"
-                     iyy="0.000052" iyz="0" izz="0.000052"/>
+            <inertia
+                ixx="0.000004"
+                ixy="0"
+                ixz="0"
+                iyy="0.000052"
+                iyz="0"
+                izz="0.000052"/>
         </inertial>
     </link>
 
@@ -150,17 +223,29 @@
     <link name="right_link_3">
         <visual>
             <origin xyz="0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
+            <material name="link_3_colour"/>
         </visual>
+
         <collision>
             <origin xyz="0.05 0 0"/>
-            <geometry><box size="0.10 0.02 0.02"/></geometry>
+            <geometry>
+                <box size="0.10 0.02 0.02"/>
+            </geometry>
         </collision>
+
         <inertial>
             <origin xyz="0.05 0 0"/>
             <mass value="0.06"/>
-            <inertia ixx="0.000004" ixy="0" ixz="0"
-                     iyy="0.000052" iyz="0" izz="0.000052"/>
+            <inertia
+                ixx="0.000004"
+                ixy="0"
+                ixz="0"
+                iyy="0.000052"
+                iyz="0"
+                izz="0.000052"/>
         </inertial>
     </link>
 
