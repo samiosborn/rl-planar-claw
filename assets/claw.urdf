@@ -1,5 +1,40 @@
 <!-- claw.urdf -->
-<robot name="planar_claw">
+<robot name="planar_claw" version="1.2">
 
+    <link name="base_link"/>
+
+    <link name="left_link_1">
+        <visual>
+            <origin xyz="0 -0.05 0"/>
+            <geometry>
+                <box size="0.02 0.10 0.02"/>
+            </geometry>
+        </visual>
+    </link>
+
+    <link name="right_link_1">
+        <visual>
+            <origin xyz="0 -0.05 0"/>
+            <geometry>
+                <box size="0.02 0.10 0.02"/>
+            </geometry>
+        </visual>
+    </link>
+
+    <joint name="left_joint_1" type="revolute">
+        <parent link="base_link"/>
+        <child link="left_link_1"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="-1.5708" upper="1.5708" effort="10" velocity="2"/>
+    </joint>
+
+    <joint name="right_joint_1" type="revolute">
+        <parent link="base_link"/>
+        <child link="right_link_1"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="-1.5708" upper="1.5708" effort="10" velocity="2"/>
+    </joint>
 
 </robot>
