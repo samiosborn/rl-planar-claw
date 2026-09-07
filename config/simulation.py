@@ -5,8 +5,12 @@ from pathlib import Path
 
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PLANE_URDF_PATH = PROJECT_ROOT / "assets" / "plane.urdf"
 CLAW_URDF_PATH = PROJECT_ROOT / "assets" / "claw.urdf"
 CUBE_URDF_PATH = PROJECT_ROOT / "assets" / "cube.urdf"
+
+# Gravitational field strength (N/kg)
+GRAVITY = 9.81
 
 # Physics step frequency
 PHYSICS_HZ = 240
@@ -43,6 +47,8 @@ INITIAL_JOINT_POSITIONS = {
 CUBE_INITIAL_POSITION = (0.0, 0.20, 0.01)
 CUBE_INITIAL_YAW = 0.0
 
-# Joint control
-MAX_JOINT_VELOCITY = 2.0  # rad/s
-MAX_JOINT_TORQUE = 10.0   # Nm
+# Max joint velocity (rad/s)
+MAX_JOINT_VELOCITY = 2.0
+
+# Max joint torque (Nm)
+MAX_JOINT_TORQUE = 10.0
