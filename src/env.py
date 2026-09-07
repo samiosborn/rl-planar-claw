@@ -1,5 +1,6 @@
 # src/env.py
 
+import math
 import pybullet as p
 
 import config.simulation as CONFIG
@@ -39,6 +40,42 @@ class PlanarClawEnv:
         self.reset()
 
 
+    # --- Helpers --- 
+
+    # Get cube yaw angle
+    def _get_cube_yaw(self) -> float: 
+        # Orientation (Quaternion)
+        _, orientation = p.getBasePositionAndOrientation(self.cube_id)
+
+        # Convert to Euler angle
+        _, _, yaw = p.getEulerFromQuaternion(orientation)
+
+        return yaw
+
+
+    # Get angle error
+    def _get_angle_error(self) -> float: 
+        difference = CONFIG.TARGET_CUBE_YAW - self._get_cube_yaw()
+
+        return math.atan2(math.sin(difference), math.cos(difference))
+
+
+    # Is successful? 
+    def _is_success(self) -> bool:
+
+        return abs(self._get_angle_error()) <= CONFIG.SUCCESS_TOLERANCE
+
+
+    # Compute reward
+    def _compute_reward(self) -> float: 
+
+        # Penalty for error in angle
+        return -abs(self._get_angle_error())
+
+
+    # API
+
+
     # Reset environment
     def reset(self) -> None: 
         # Reset claw joint positions and velocities
@@ -58,4 +95,11 @@ class PlanarClawEnv:
             self.cube_id, 
             linearVelocity=[0.0, 0.0, 0.0], 
             angularVelocity=[0.0, 0.0, 0.0])
-        
+
+        # Reset statistics
+        self.step_count = 0
+        self.previous_angle_error = abs(self._angle_error())
+
+        return self.get_observation()
+
+    

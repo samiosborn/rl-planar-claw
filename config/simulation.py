@@ -1,5 +1,7 @@
 # config/simulation.py
 
+import math
+
 from pathlib import Path
 
 
@@ -52,3 +54,9 @@ MAX_JOINT_VELOCITY = 2.0
 
 # Max joint torque (Nm)
 MAX_JOINT_TORQUE = 10.0
+
+# Target cube yaw angle (degrees)
+TARGET_CUBE_YAW = math.pi / 4
+
+# Success tolerance (radians)
+SUCCESS_TOLERANCE = math.radians(5)
