@@ -1,0 +1,32 @@
+<!-- assets/cube.urdf -->
+<robot name="cube" version="1.0">
+
+    <link name="cube_link">
+        <visual>
+            <geometry>
+                <box size="0.08 0.08 0.02"/>
+            </geometry>
+            <material name="cube_colour">
+                <color rgba="0.75 0.25 0.25 1"/>
+            </material>
+        </visual>
+
+        <collision>
+            <geometry>
+                <box size="0.08 0.08 0.02"/>
+            </geometry>
+        </collision>
+
+        <inertial>
+            <mass value="0.10"/>
+            <inertia
+                ixx="0.000057"
+                ixy="0"
+                ixz="0"
+                iyy="0.000057"
+                iyz="0"
+                izz="0.000107"/>
+        </inertial>
+    </link>
+
+</robot>
