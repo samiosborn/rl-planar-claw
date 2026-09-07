@@ -1,7 +1,9 @@
-<!-- claw.urdf -->
-<robot name="planar_claw" version="1.2">
+<!-- assets/claw.urdf -->
+<robot name="planar_claw" version="1.0">
+
 
     <!-- Link colours -->
+    
     <material name="link_1_colour">
         <color rgba="0.20 0.45 0.90 1"/>
     </material>
@@ -14,8 +16,10 @@
         <color rgba="0.95 0.55 0.20 1"/>
     </material>
 
+
     <!-- Both fingers of the claw have the same fixed base -->
     <link name="base_link"/>
+
 
     <!-- Left finger -->
 
@@ -132,6 +136,7 @@
                 izz="0.000052"/>
         </inertial>
     </link>
+
 
     <!-- Right finger -->
 
