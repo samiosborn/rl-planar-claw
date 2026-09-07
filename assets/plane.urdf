@@ -1,0 +1,25 @@
+<!-- assets/plane.urdf -->
+<robot name="plane" version="1.0">
+
+    <link name="plane_link">
+
+        <visual>
+            <origin xyz="0 0 -0.01"/>
+            <geometry>
+                <box size="1.0 1.0 0.02"/>
+            </geometry>
+            <material name="plane_colour">
+                <color rgba="0.65 0.65 0.65 1"/>
+            </material>
+        </visual>
+
+        <collision>
+            <origin xyz="0 0 -0.01"/>
+            <geometry>
+                <box size="1.0 1.0 0.02"/>
+            </geometry>
+        </collision>
+
+    </link>
+
+</robot>
