@@ -425,13 +425,261 @@ This motivates temporal-difference learning: instead of waiting for the complete
 
 ## Temporal-Difference Learning
 
+Temporal-difference learning updates a value estimate using the observed immediate reward together with an estimate of the value of the next state.
+
+Unlike Monte Carlo methods, it does not wait for the complete return $G_t$ to be observed.
+
+---
+
 ### TD Target
+
+For one-step temporal-difference learning, the TD target is
+
+$$
+\text{TD target}
+=
+R_{t+1}
++
+\gamma V(S_{t+1})
+$$
+
+The update is
+
+$$
+V(S_t)
+\leftarrow
+V(S_t)
++
+\alpha
+\left[
+R_{t+1}
++
+\gamma V(S_{t+1})
+-
+V(S_t)
+\right]
+$$
+
+Because the TD target depends on another value estimate, TD learning is a bootstrapping method.
+
+---
 
 ### TD Error
 
+**Definition — Temporal-Difference Error**
+
+The temporal-difference error is the difference between the TD target and the current value estimate. 
+
+For one-step TD learning,  
+
+$$
+\delta_t
+=
+R_{t+1}
++
+\gamma V(S_{t+1})
+-
+V(S_t)
+$$
+
+The TD update can therefore be written as
+
+$$
+V(S_t)
+\leftarrow
+V(S_t)
++
+\alpha \delta_t
+$$
+
+---
+
 ### TD Error as an Advantage Estimate
 
+Recall that the advantage function is
+
+$$
+A^\pi(s,a)
+=
+Q^\pi(s,a)
+-
+V^\pi(s)
+$$
+
+If the value estimate is exact, so that
+
+$$
+V(S_t)
+=
+V^\pi(S_t)
+$$
+
+Then the expected TD error conditioned on the current state and action is
+
+$$
+\mathbb{E}_\pi
+\left[
+\delta_t
+\mid
+S_t=s,\,
+A_t=a
+\right]
+$$
+
+Substituting the definition of $\delta_t$,
+
+$$
+\mathbb{E}_\pi
+\left[
+R_{t+1}
++
+\gamma V^\pi(S_{t+1})
+-
+V^\pi(S_t)
+\mid
+S_t=s,\,
+A_t=a
+\right]
+$$
+
+Since $V^\pi(S_t)=V^\pi(s)$ is fixed under the conditioning,
+
+$$
+=
+\mathbb{E}_\pi
+\left[
+R_{t+1}
++
+\gamma V^\pi(S_{t+1})
+\mid
+S_t=s,\,
+A_t=a
+\right]
+-
+V^\pi(s)
+$$
+
+By the Bellman equation for the action-value function,
+
+$$
+Q^\pi(s,a)
+=
+\mathbb{E}_\pi
+\left[
+R_{t+1}
++
+\gamma V^\pi(S_{t+1})
+\mid
+S_t=s,\,
+A_t=a
+\right]
+$$
+
+Therefore,
+
+$$
+\mathbb{E}_\pi
+\left[
+\delta_t
+\mid
+S_t=s,\,
+A_t=a
+\right]
+=
+A^\pi(s,a)
+$$
+
+Thus, when the value function is accurate, the TD error provides a one-step sample estimate of the advantage.
+
+This is an important connection between value learning and policy-gradient methods.
+
+---
+
 ### n-Step Returns
+
+One-step TD uses the target
+
+$$
+R_{t+1}
++
+\gamma V(S_{t+1})
+$$
+
+Monte Carlo uses the full sampled return
+
+$$
+G_t.
+$$
+
+An $n$-step return lies between these two extremes.
+
+**Definition — n-Step Return**
+
+The $n$-step return from time $t$ is
+
+$$
+G_t^{(n)}
+=
+R_{t+1}
++
+\gamma R_{t+2}
++
+\cdots
++
+\gamma^{n-1}R_{t+n}
++
+\gamma^n V(S_{t+n})
+$$
+
+The first $n$ rewards are observed directly, while the remaining future return is approximated using the value estimate $V(S_{t+n})$.
+
+For $n=1$,
+
+$$
+G_t^{(1)}
+=
+R_{t+1}
++
+\gamma V(S_{t+1})
+$$
+
+Which is the ordinary one-step TD target.
+
+For $n=2$,
+
+$$
+G_t^{(2)}
+=
+R_{t+1}
++
+\gamma R_{t+2}
++
+\gamma^2 V(S_{t+2})
+$$
+
+As $n$ increases, the estimate relies on more observed rewards and less bootstrapping.
+
+For an episodic task, if $n$ extends all the way to the end of the episode, then
+
+$$
+G_t^{(n)}
+=
+G_t
+$$
+
+and the $n$-step return becomes the Monte Carlo return.
+
+Thus,
+
+$$
+\text{1-step TD}
+\longrightarrow
+\text{n-step returns}
+\longrightarrow
+\text{Monte Carlo}
+$$
+
+Which forms a continuum between heavy bootstrapping and using the full sampled return.
 
 ## Lambda Returns
 
