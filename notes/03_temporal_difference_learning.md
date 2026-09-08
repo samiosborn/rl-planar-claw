@@ -506,14 +506,6 @@ Q^\pi(s,a)
 V^\pi(s)
 $$
 
-If the value estimate is exact, so that
-
-$$
-V(S_t)
-=
-V^\pi(S_t)
-$$
-
 Then the expected TD error conditioned on the current state and action is
 
 $$
@@ -524,11 +516,7 @@ $$
 S_t=s,\,
 A_t=a
 \right]
-$$
-
-Substituting the definition of $\delta_t$,
-
-$$
+= 
 \mathbb{E}_\pi
 \left[
 R_{t+1}
@@ -545,7 +533,14 @@ $$
 Since $V^\pi(S_t)=V^\pi(s)$ is fixed under the conditioning,
 
 $$
-=
+\mathbb{E}_\pi
+\left[
+\delta_t
+\mid
+S_t=s,\,
+A_t=a
+\right]
+= 
 \mathbb{E}_\pi
 \left[
 R_{t+1}
@@ -562,17 +557,17 @@ $$
 By the Bellman equation for the action-value function,
 
 $$
-Q^\pi(s,a)
-=
 \mathbb{E}_\pi
 \left[
-R_{t+1}
-+
-\gamma V^\pi(S_{t+1})
+\delta_t
 \mid
 S_t=s,\,
 A_t=a
 \right]
+= 
+Q^\pi(s,a)
+-
+V^\pi(s)
 $$
 
 Therefore,
@@ -597,22 +592,6 @@ This is an important connection between value learning and policy-gradient metho
 
 ### n-Step Returns
 
-One-step TD uses the target
-
-$$
-R_{t+1}
-+
-\gamma V(S_{t+1})
-$$
-
-Monte Carlo uses the full sampled return
-
-$$
-G_t.
-$$
-
-An $n$-step return lies between these two extremes.
-
 **Definition — n-Step Return**
 
 The $n$-step return from time $t$ is
@@ -631,7 +610,7 @@ R_{t+1}
 \gamma^n V(S_{t+n})
 $$
 
-The first $n$ rewards are observed directly, while the remaining future return is approximated using the value estimate $V(S_{t+n})$.
+---
 
 For $n=1$,
 
@@ -657,7 +636,7 @@ R_{t+1}
 \gamma^2 V(S_{t+2})
 $$
 
-As $n$ increases, the estimate relies on more observed rewards and less bootstrapping.
+As $n$ increases, the estimate relies on more observed rewards and less on bootstrapping.
 
 For an episodic task, if $n$ extends all the way to the end of the episode, then
 
@@ -667,20 +646,157 @@ G_t^{(n)}
 G_t
 $$
 
-and the $n$-step return becomes the Monte Carlo return.
-
-Thus,
-
-$$
-\text{1-step TD}
-\longrightarrow
-\text{n-step returns}
-\longrightarrow
-\text{Monte Carlo}
-$$
-
-Which forms a continuum between heavy bootstrapping and using the full sampled return.
+Im this case, the $n$-step return in TD learning becomes the Monte Carlo return.
 
 ## Lambda Returns
 
+Recall the n-step return
+
+$$
+G_t^{(n)}
+=
+R_{t+1}
++
+\gamma R_{t+2}
++
+\cdots
++
+\gamma^{n-1}R_{t+n}
++
+\gamma^n V(S_{t+n})
+$$
+
+---
+
+**Definition — Lambda Return**
+
+The $\lambda$-return is
+
+$$
+G_t^\lambda
+=
+(1-\lambda)
+\sum_{n=1}^{\infty}
+\lambda^{n-1}
+G_t^{(n)}
+$$
+
+The $\lambda$-return is a weighted average of n-step returns.
+
+Since for $ 0 \leq \lambda \leq 1 $, 
+
+$$
+(1-\lambda)
+\sum_{n=1}^{\infty}
+\lambda^{n-1}
+=
+1
+$$
+
+
+
+---
+
+### Recursive Form
+
+The $\lambda$-return can also be expressed recursively as
+
+$$
+G_t^\lambda
+=
+R_{t+1}
++
+\gamma
+\left[
+(1-\lambda)V(S_{t+1})
++
+\lambda G_{t+1}^\lambda
+\right]
+$$
+
+With probability weight $1-\lambda$ the return effectively bootstraps from $V(S_{t+1})$, and with weight $\lambda$ it continues incorporating information from later rewards.
+
+The value function can then be updated towards the $\lambda$-return:
+
+$$
+V(S_t)
+\leftarrow
+V(S_t)
++
+\alpha
+\left[
+G_t^\lambda
+-
+V(S_t)
+\right]
+$$
+
+---
+
+### Limiting Cases
+
+As $ \lambda \rightarrow 1 $, more weight is placed on long-horizon returns.
+
+When $ \lambda=0 $, this becomes the one-step TD target. 
+
+For an episodic problem, the limiting case $ \lambda=1 $ corresponds to the complete Monte Carlo return: $ G_t^1 = G_t $
+
+Intermediate values of $\lambda$ interpolate between these two extremes. 
+
+The purpose of intermediate values of $\lambda$ is not to eliminate bias or variance, but to find a useful balance between them.
+
+---
+
 ## Bias-Variance Trade-off
+
+The choice between Monte Carlo, one-step TD, and intermediate $n$-step or $\lambda$-return methods involves a trade-off between bias and variance.
+
+### Monte Carlo
+
+Monte Carlo uses the complete observed return
+
+$$
+G_t
+=
+R_{t+1}
++
+\gamma R_{t+2}
++
+\gamma^2 R_{t+3}
++
+\cdots
+$$
+
+It does not bootstrap from the current value estimate.
+
+Therefore, the target does not inherit error directly from an inaccurate estimate $V(S_{t+1})$. 
+
+However, $G_t$ depends on the entire stochastic future trajectory. 
+
+Different trajectories starting from the same state may therefore produce substantially different returns. 
+
+Monte Carlo methods consequently tend to have low bias and high variance in their return estimates. 
+
+---
+
+### n-Step Returns
+
+The $n$-step return provides a spectrum between these cases:
+
+$$
+G_t^{(n)}
+=
+R_{t+1}
++
+\cdots
++
+\gamma^{n-1}R_{t+n}
++
+\gamma^nV(S_{t+n})
+$$
+
+For small $n$, the estimate uses more bootstrapping, and introduces more bias. 
+
+For large $n$, the estimate uses more sampled rewards, which leads to higher variance. 
+
+---
