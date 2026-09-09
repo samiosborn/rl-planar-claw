@@ -65,7 +65,7 @@ class PlanarClawEnv:
     def _is_success(self, angle_error: float) -> bool:
         return abs(angle_error) <= CONFIG.SUCCESS_TOLERANCE
 
-    # Has cube orientation moved outside the allowed range?
+    # Has cube moved too far from the target orientation?
     def _is_failure(self, angle_error: float) -> bool:
         return abs(angle_error) >= CONFIG.MAX_ANGLE_ERROR
 
@@ -157,3 +157,9 @@ class PlanarClawEnv:
         
         # Return transition
         return next_state, reward, terminated, truncated
+
+
+    # Close environment
+    def close(self) -> None:
+        if p.isConnected(self.physics_client_id):
+            p.disconnect(self.physics_client_id)
