@@ -4,11 +4,14 @@ import pybullet as p
 
 import config.simulation as CONFIG
 
+
 class PlanarClaw: 
     def __init__(self, body_id: int): 
         self.body_id = body_id
         self.joint_indices = self._get_joint_indices()
 
+
+    # --- Helper ---
 
     # Return joint indices as a dictionary
     def _get_joint_indices(self) -> dict[str, int]:
@@ -26,21 +29,28 @@ class PlanarClaw:
         return joint_indices
 
 
-    # Reset to initial joint positions
-    def reset_joint_positions(self) -> None: 
+    # --- API ---
+
+
+    # Reset robot
+    def reset(self, joint_positions: dict[str, float]) -> None: 
         # Loop over joints
-        for joint_name, position in CONFIG.INITIAL_JOINT_POSITIONS.items(): 
+        for joint_name, position in joint_positions.items(): 
+
             joint_index = self.joint_indices[joint_name]
 
-            # Set joint to initial position
+            # Set joints to initial position
             p.resetJointState(
                 self.body_id, 
                 joint_index, 
                 targetValue=position,
                 targetVelocity=0.0)
 
+        # Stop joint motors 
+        self.set_joint_velocities([0.0] * len(CONFIG.JOINTS))
 
-    # Get joint positions
+
+    # Get joint positions (angle)
     def get_joint_positions(self) -> list[float]: 
 
         # Loop over joints (0 = position)
@@ -50,7 +60,7 @@ class PlanarClaw:
             for joint_name in CONFIG.JOINTS]
 
 
-    # Get joint velocities
+    # Get joint velocities (angular velocity)
     def get_joint_velocities(self) -> list[float]: 
 
         # Loop over joints (1 = velocity)

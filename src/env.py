@@ -1,10 +1,12 @@
 # src/env.py
 
 import math
+import numpy as np
 import pybullet as p
 
 import config.simulation as CONFIG
 from src.robot import PlanarClaw
+from src.cube import Cube
 
 
 class PlanarClawEnv: 
@@ -25,16 +27,8 @@ class PlanarClawEnv:
         self.robot = PlanarClaw(self.claw_id)
 
         # Load cube
-        self.initial_cube_orientation = p.getQuaternionFromEuler([0.0, 0.0, CONFIG.CUBE_INITIAL_YAW])
-
-        self.cube_id = p.loadURDF(
-            str(CONFIG.CUBE_URDF_PATH), 
-            basePosition=CONFIG.CUBE_INITIAL_POSITION, 
-            baseOrientation=self.initial_cube_orientation, 
-            useFixedBase=False)
-
-        # Number of physics steps per control step
-        self.physics_steps_per_control = CONFIG.PHYSICS_HZ // CONFIG.CONTROL_HZ
+        self.cube_id = p.loadURDF(str(CONFIG.CUBE_URDF_PATH), useFixedBase=False)
+        self.cube = Cube(self.cube_id)
 
         # Reset
         self.reset()
@@ -42,29 +36,16 @@ class PlanarClawEnv:
 
     # --- Helpers --- 
 
-    # Get cube yaw angle
-    def _get_cube_yaw(self) -> float: 
-        # Orientation (Quaternion)
-        _, orientation = p.getBasePositionAndOrientation(self.cube_id)
-
-        # Convert to Euler angle
-        _, _, yaw = p.getEulerFromQuaternion(orientation)
-
-        return yaw
-
-
     # Get angle error
     def _get_angle_error(self) -> float: 
-        difference = CONFIG.TARGET_CUBE_YAW - self._get_cube_yaw()
+        difference = CONFIG.TARGET_CUBE_YAW - self.cube.get_yaw()
 
         return math.atan2(math.sin(difference), math.cos(difference))
-
 
     # Is successful? 
     def _is_success(self) -> bool:
 
         return abs(self._get_angle_error()) <= CONFIG.SUCCESS_TOLERANCE
-
 
     # Compute reward
     def _compute_reward(self) -> float: 
@@ -73,33 +54,48 @@ class PlanarClawEnv:
         return -abs(self._get_angle_error())
 
 
-    # API
+    # --- API ---
 
 
     # Reset environment
-    def reset(self) -> None: 
-        # Reset claw joint positions and velocities
-        self.robot.reset_joint_positions()
+    def reset(self) -> np.ndarray: 
+        # Reset robot claw
+        self.robot.reset(CONFIG.INITIAL_JOINT_POSITIONS)
 
-        # Stop joint motors 
-        self.robot.set_joint_velocities([0.0] * len(CONFIG.JOINTS))
-
-        # Reset cube position and orientation
-        p.resetBasePositionAndOrientation(
-            self.cube_id, 
-            basePosition=CONFIG.CUBE_INITIAL_POSITION, 
-            baseOrientation=self.initial_cube_orientation)
-
-        # Reset cube linear and angular velocities
-        p.resetBaseVelocity(
-            self.cube_id, 
-            linearVelocity=[0.0, 0.0, 0.0], 
-            angularVelocity=[0.0, 0.0, 0.0])
+        # Reset cube
+        self.cube.reset(CONFIG.CUBE_INITIAL_POSITION, CONFIG.CUBE_INITIAL_YAW)
 
         # Reset statistics
         self.step_count = 0
-        self.previous_angle_error = abs(self._angle_error())
+        self.previous_angle_error = abs(self._get_angle_error())
 
         return self.get_observation()
 
+
+    # Get observation
+    def get_observation(self) -> np.ndarray: 
+
+        # Joint positions and velocities
+        joint_positions = self.robot.get_joint_positions()
+        joint_velocities = self.robot.get_joint_velocities()
+
+        # Cube position, yaw, linear velocity, and angular velocity
+        cube_position, cube_yaw, cube_linear_velocity, cube_angular_velocity = self.cube.get_state()
+
+        # Build observation array
+        observation = np.array(
+        [
+            *joint_positions,
+            *joint_velocities,
+            cube_position[0],
+            cube_position[1],
+            math.sin(cube_yaw),
+            math.cos(cube_yaw),
+            cube_linear_velocity[0],
+            cube_linear_velocity[1],
+            cube_angular_velocity[2],
+        ],
+        dtype=np.float32)
+
+        return observation
     

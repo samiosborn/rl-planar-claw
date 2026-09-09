@@ -20,6 +20,9 @@ PHYSICS_HZ = 240
 # Control step frequency
 CONTROL_HZ = 30
 
+# Number of physics steps per control step
+PHYSICS_STEPS_PER_CONTROL = PHYSICS_HZ // CONTROL_HZ
+
 # Joint names
 LEFT_JOINTS = (
     "left_joint_1",
@@ -34,6 +37,9 @@ RIGHT_JOINTS = (
 )
 
 JOINTS = LEFT_JOINTS + RIGHT_JOINTS
+
+# Observation dimensions
+OBSERVATION_DIM = 19
 
 # Initial joint positions
 INITIAL_JOINT_POSITIONS = {
@@ -55,7 +61,7 @@ MAX_JOINT_VELOCITY = 2.0
 # Max joint torque (Nm)
 MAX_JOINT_TORQUE = 10.0
 
-# Target cube yaw angle (degrees)
+# Target cube yaw angle (radians)
 TARGET_CUBE_YAW = math.pi / 4
 
 # Success tolerance (radians)
