@@ -38,8 +38,8 @@ class Cube:
         # Reset position and orientation
         p.resetBasePositionAndOrientation(
             self.body_id,
-            basePosition=position,
-            baseOrientation=orientation)
+            posObj=position,
+            ornObj=orientation)
 
         # Reset linear and angular velocity to zero
         p.resetBaseVelocity(

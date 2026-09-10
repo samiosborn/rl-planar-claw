@@ -7,7 +7,7 @@ from src.env import PlanarClawEnv
 
 
 # Create environment
-env = PlanarClawEnv(gui=False)
+env = PlanarClawEnv(gui=True)
 
 try:
     # Reset state
@@ -54,4 +54,3 @@ try:
 finally:
     # Close environment
     env.close()
-    
