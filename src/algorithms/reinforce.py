@@ -50,3 +50,34 @@ def sample_action(policy: PolicyNetwork, state: torch.Tensor) -> tuple[torch.Ten
     log_prob = distribution.log_prob(actions).sum()
 
     return actions, log_prob
+
+
+# Compute returns-to-go
+def compute_returns(rewards, gamma):
+    # Initialise
+    G = 0.0
+    returns = []
+
+    # Compute return-to-go backwards
+    for reward in reversed(rewards):
+        G = reward + gamma * G
+        returns.append(G)
+
+    # Restore chronological order
+    returns.reverse()
+
+    return returns
+
+
+# Compute policy loss
+def compute_policy_loss(log_probs, returns): 
+    # Convert into a single tensor
+    log_probs = torch.stack(log_probs)
+    returns = torch.tensor(returns, dtype=torch.float32)
+
+    # Monte Carlo policy objective (J)
+    policy_objective = (log_probs * returns).sum()
+
+    # Gradient descent on negative objective = gradient ascent on objective
+    return -policy_objective
+
