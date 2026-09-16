@@ -101,3 +101,15 @@ JOINT_ACTION_VELOCITIES = (
     0.0,
     MAX_JOINT_VELOCITY,
 )
+
+
+# --- Hyper-parameters ---
+
+# Discount factor
+GAMMA = 0.99
+
+
+# --- Testing ---
+
+# Number of trajectories sampled for eval visualisation
+NUM_ROLLOUT_EPISODES = 30

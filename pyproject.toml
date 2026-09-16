@@ -3,6 +3,7 @@ name = "rl-planar-claw"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
+    "matplotlib>=3.11.2",
     "numpy>=2.4.6",
     "pybullet>=3.2.7",
     "pytest>=9.1.1",
