@@ -27,14 +27,12 @@ try:
         ]
 
         # Step environment
-        next_state, reward, terminated, truncated = env.step(actions)
+        next_state, reward, done = env.step(actions)
 
         # Update state
         state = next_state
 
         # Check whether episode has ended
-        done = terminated or truncated
-
         if done:
             break
 
@@ -47,8 +45,7 @@ try:
         f"Episode ended | "
         f"steps={env.step_count} | "
         f"success_steps={env.success_steps} | "
-        f"terminated={terminated} | "
-        f"truncated={truncated}"
+        f"done={done}"
     )
 
 finally:

@@ -1,5 +1,7 @@
 # tests/test_env.py
 
+import math
+
 import numpy as np
 import pytest
 
@@ -40,14 +42,13 @@ def test_step():
         actions = [1] * len(CONFIG.JOINTS)
 
         # Step environment
-        next_state, reward, terminated, truncated = env.step(actions)
+        next_state, reward, done = env.step(actions)
 
         # Check returned transition
         assert isinstance(next_state, np.ndarray)
         assert next_state.shape == (CONFIG.OBSERVATION_DIM,)
         assert isinstance(reward, float)
-        assert isinstance(terminated, bool)
-        assert isinstance(truncated, bool)
+        assert isinstance(done, bool)
 
     finally:
         # Close environment
@@ -110,8 +111,8 @@ def test_invalid_action_type():
         env.close()
 
 
-# Test episode truncation
-def test_episode_truncation():
+# Test episode length
+def test_episode_length():
     # Create environment
     env = PlanarClawEnv(gui=False)
 
@@ -123,15 +124,64 @@ def test_episode_truncation():
         actions = [1] * len(CONFIG.JOINTS)
 
         # Run until final allowed step
-        for _ in range(CONFIG.MAX_EPISODE_STEPS):
-            _, _, terminated, truncated = env.step(actions)
+        for step in range(1, CONFIG.MAX_EPISODE_STEPS + 1):
+            _, _, done = env.step(actions)
 
-            # Episode should not terminate through failure
-            assert not terminated
+            # Episode ends only on the final allowed step
+            assert done == (step == CONFIG.MAX_EPISODE_STEPS)
 
-        # Check truncation
-        assert truncated
+        # Check final step count
+        assert done
         assert env.step_count == CONFIG.MAX_EPISODE_STEPS
+
+    finally:
+        # Close environment
+        env.close()
+
+
+# Test large angle errors do not end an episode early
+@pytest.mark.parametrize("angle_error", [-math.pi, -math.pi / 2, math.pi / 2, math.pi])
+def test_large_angle_error(angle_error, monkeypatch):
+    # Create environment
+    env = PlanarClawEnv(gui=False)
+
+    try:
+        # Hold angle error at a controlled value
+        monkeypatch.setattr(env, "get_angle_error", lambda: angle_error)
+        actions = [1] * len(CONFIG.JOINTS)
+
+        # Run a complete episode
+        for step in range(1, CONFIG.MAX_EPISODE_STEPS + 1):
+            _, reward, done = env.step(actions)
+
+            # Keep the same reward and episode length
+            assert reward == -abs(angle_error)
+            assert done == (step == CONFIG.MAX_EPISODE_STEPS)
+
+        assert env.success_steps == 0
+
+    finally:
+        # Close environment
+        env.close()
+
+
+# Test success tracking does not end an episode early
+def test_success_tracking(monkeypatch):
+    # Create environment
+    env = PlanarClawEnv(gui=False)
+
+    try:
+        # Hold angle error within success tolerance
+        monkeypatch.setattr(env, "get_angle_error", lambda: CONFIG.SUCCESS_TOLERANCE)
+        actions = [1] * len(CONFIG.JOINTS)
+
+        # Run a complete episode
+        for step in range(1, CONFIG.MAX_EPISODE_STEPS + 1):
+            _, _, done = env.step(actions)
+
+            # Track success without ending early
+            assert env.success_steps == step
+            assert done == (step == CONFIG.MAX_EPISODE_STEPS)
 
     finally:
         # Close environment

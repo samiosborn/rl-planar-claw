@@ -59,14 +59,6 @@ class PlanarClawEnv:
     def _is_success(self, angle_error: float) -> bool:
         return abs(angle_error) <= CONFIG.SUCCESS_TOLERANCE
 
-    # Has cube moved too far from the target orientation?
-    def _is_failure(self, angle_error: float) -> bool:
-        return abs(angle_error) >= CONFIG.MAX_ANGLE_ERROR
-
-    # Has episode reached max length?
-    def _is_truncated(self) -> bool:
-        return self.step_count >= CONFIG.MAX_EPISODE_STEPS
-
 
     # --- API ---
 
@@ -122,7 +114,7 @@ class PlanarClawEnv:
 
 
     # One step in MDP
-    def step(self, actions) -> tuple[np.ndarray, float, bool, bool]:
+    def step(self, actions) -> tuple[np.ndarray, float, bool]:
         # Validate discrete action
         self._validate_actions(actions)
         
@@ -153,11 +145,10 @@ class PlanarClawEnv:
             self.success_steps += 1
 
         # Determine whether episode is finished
-        terminated = self._is_failure(angle_error)
-        truncated = self._is_truncated()
+        done = self.step_count >= CONFIG.MAX_EPISODE_STEPS
         
         # Return transition
-        return next_state, reward, terminated, truncated
+        return next_state, reward, done
 
 
     # Close environment

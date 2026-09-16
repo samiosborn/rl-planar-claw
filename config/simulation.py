@@ -80,9 +80,6 @@ CUBE_INITIAL_YAW = 0.0
 # Target cube yaw angle (radians)
 TARGET_CUBE_YAW = math.pi / 4
 
-# Maximum angle error (radians)
-MAX_ANGLE_ERROR = math.pi / 2
-
 # Maximum control steps per episode
 MAX_EPISODE_STEPS = 300
 
