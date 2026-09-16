@@ -81,3 +81,65 @@ def compute_policy_loss(log_probs, returns):
     # Gradient descent on negative objective = gradient ascent on objective
     return -policy_objective
 
+
+# Train policy from one episode
+def train_episode(env, policy, optimiser, gamma): 
+    # Reset environment
+    state = env.reset()
+
+    # Initialise rewards and log-probabilities
+    rewards = []
+    log_probs = []
+
+    # Reset episode
+    terminated = False
+    truncated = False
+
+    # Loop until done
+    while not (terminated or truncated): 
+        # Convert state into tensor
+        state_tensor = torch.tensor(state, dtype=torch.float32)
+
+        # Sample action from policy
+        action, log_prob = sample_action(policy, state_tensor)
+
+        # State transition following action (converted to list first)
+        next_state, reward, terminated, truncated = env.step(action.tolist())
+
+        # Append
+        rewards.append(reward)
+        log_probs.append(log_prob)
+
+        # Update current state
+        state = next_state
+
+    # Compute returns
+    returns = compute_returns(rewards, gamma)
+
+    # Compute policy loss
+    loss = compute_policy_loss(log_probs, returns)
+
+    # Clear previous episode gradients
+    optimiser.zero_grad()
+
+    # Compute gradients
+    loss.backward()
+
+    # Gradient norm
+    gradient_norm_squared = 0.0
+
+    for parameter in policy.parameters(): 
+        if parameter.grad is not None: 
+            gradient_norm_squared += parameter.grad.pow(2).sum().item()
+
+    # Update policy parameters
+    optimiser.step()
+
+    # Debug outputs
+    return {
+        "loss": loss.item(), 
+        "episode_length": len(rewards), 
+        "undiscounted_return": sum(rewards), 
+        "discounted_return": returns[0], 
+        "gradient_norm": gradient_norm_squared ** 0.5,
+    }
