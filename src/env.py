@@ -36,12 +36,6 @@ class PlanarClawEnv:
 
     # --- Helpers --- 
 
-    # Get angle error
-    def _get_angle_error(self) -> float: 
-        difference = CONFIG.TARGET_CUBE_YAW - self.cube.get_yaw()
-
-        return math.atan2(math.sin(difference), math.cos(difference))
-
     # Validate actions
     def _validate_actions(self, actions) -> None:
         if len(actions) != len(CONFIG.JOINTS):
@@ -75,6 +69,13 @@ class PlanarClawEnv:
 
 
     # --- API ---
+
+
+    # Get angle error
+    def get_angle_error(self) -> float: 
+        difference = CONFIG.TARGET_CUBE_YAW - self.cube.get_yaw()
+
+        return math.atan2(math.sin(difference), math.cos(difference))
 
 
     # Reset environment
@@ -142,7 +143,7 @@ class PlanarClawEnv:
         next_state = self.get_observation()
 
         # Compute angle error
-        angle_error = self._get_angle_error()
+        angle_error = self.get_angle_error()
 
         # Compute reward
         reward = self._compute_reward(angle_error)
