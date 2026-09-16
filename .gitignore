@@ -1,4 +1,15 @@
+# .gitignore
+
+# Python virtual environment
 .venv/
+
+# Python cache / compiled files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Pytest cache
+.pytest_cache/
+
+# VS Code
 .vscode/
