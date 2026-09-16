@@ -92,11 +92,10 @@ def train_episode(env, policy, optimiser, gamma):
     log_probs = []
 
     # Reset episode
-    terminated = False
-    truncated = False
+    done = False
 
     # Loop until done
-    while not (terminated or truncated): 
+    while not done: 
         # Convert state into tensor
         state_tensor = torch.tensor(state, dtype=torch.float32)
 
@@ -104,7 +103,7 @@ def train_episode(env, policy, optimiser, gamma):
         action, log_prob = sample_action(policy, state_tensor)
 
         # State transition following action (converted to list first)
-        next_state, reward, terminated, truncated = env.step(action.tolist())
+        next_state, reward, done = env.step(action.tolist())
 
         # Append
         rewards.append(reward)
