@@ -112,7 +112,10 @@ GAMMA = 0.99
 LEARNING_RATE = 1e-3
 
 # Number of training episodes
-NUM_TRAINING_EPISODES = 1000
+NUM_TRAINING_EPISODES = 1500
+
+# Number of trajectories per policy gradient batch
+REINFORCE_BATCH_SIZE = 15
 
 
 # --- Testing ---

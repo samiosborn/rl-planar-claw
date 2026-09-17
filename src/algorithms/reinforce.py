@@ -82,8 +82,8 @@ def compute_policy_loss(log_probs, returns):
     return -policy_objective
 
 
-# Train policy from one episode
-def train_episode(env, policy, optimiser, gamma): 
+# Sample one complete episode and compute its REINFORCE loss
+def run_episode(env, policy, gamma):
     # Reset environment
     state = env.reset()
 
@@ -95,7 +95,7 @@ def train_episode(env, policy, optimiser, gamma):
     done = False
 
     # Loop until done
-    while not done: 
+    while not done:
         # Convert state into tensor
         state_tensor = torch.tensor(state, dtype=torch.float32)
 
@@ -115,30 +115,62 @@ def train_episode(env, policy, optimiser, gamma):
     # Compute returns
     returns = compute_returns(rewards, gamma)
 
-    # Compute policy loss
+    # Compute policy loss (sum over timesteps)
     loss = compute_policy_loss(log_probs, returns)
 
-    # Clear previous episode gradients
+    # Debug outputs (loss kept as a tensor so it can still be backpropagated)
+    return {
+        "loss": loss,
+        "episode_length": len(rewards),
+        "undiscounted_return": sum(rewards),
+        "discounted_return": returns[0],
+    }
+
+
+# Train policy from a batch of complete trajectories (Monte Carlo REINFORCE)
+def train_batch(env, policy, optimiser, gamma, batch_size):
+    # Clear gradients once for the whole batch
     optimiser.zero_grad()
 
-    # Compute gradients
-    loss.backward()
+    # Initialise per-episode diagnostics
+    losses = []
+    episode_lengths = []
+    undiscounted_returns = []
+    discounted_returns = []
 
-    # Gradient norm
+    # Sample batch_size complete episodes
+    for _ in range(batch_size):
+        # Collect one trajectory and its REINFORCE loss
+        episode = run_episode(env, policy, gamma)
+
+        # Average trajectory losses by backpropagating loss / batch_size
+        # for each trajectory; PyTorch accumulates the resulting gradients
+        (episode["loss"] / batch_size).backward()
+
+        # Record diagnostics
+        losses.append(episode["loss"].item())
+        episode_lengths.append(episode["episode_length"])
+        undiscounted_returns.append(episode["undiscounted_return"])
+        discounted_returns.append(episode["discounted_return"])
+
+    # Gradient norm, computed after all trajectory gradients have accumulated
     gradient_norm_squared = 0.0
 
-    for parameter in policy.parameters(): 
-        if parameter.grad is not None: 
+    for parameter in policy.parameters():
+        if parameter.grad is not None:
             gradient_norm_squared += parameter.grad.pow(2).sum().item()
 
-    # Update policy parameters
+    # Update policy parameters exactly once for the batch
     optimiser.step()
 
     # Debug outputs
     return {
-        "loss": loss.item(), 
-        "episode_length": len(rewards), 
-        "undiscounted_return": sum(rewards), 
-        "discounted_return": returns[0], 
+        "num_episodes": batch_size,
+        "episode_lengths": episode_lengths,
+        "mean_loss": sum(losses) / batch_size,
+        "mean_undiscounted_return": sum(undiscounted_returns) / batch_size,
+        "mean_discounted_return": sum(discounted_returns) / batch_size,
+        "min_discounted_return": min(discounted_returns),
+        "max_discounted_return": max(discounted_returns),
         "gradient_norm": gradient_norm_squared ** 0.5,
     }
