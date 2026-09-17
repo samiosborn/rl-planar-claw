@@ -112,10 +112,19 @@ GAMMA = 0.99
 LEARNING_RATE = 1e-3
 
 # Number of training episodes
-NUM_TRAINING_EPISODES = 1500
+NUM_TRAINING_EPISODES = 10000
 
 # Number of trajectories per policy gradient batch
-REINFORCE_BATCH_SIZE = 15
+REINFORCE_BATCH_SIZE = 20
+
+
+# --- Checkpoints ---
+
+# Save policy every N training episodes
+CHECKPOINT_INTERVAL_EPISODES = 150
+
+# REINFORCE checkpoint directory
+REINFORCE_CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints" / "reinforce"
 
 
 # --- Testing ---
