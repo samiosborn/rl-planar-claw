@@ -108,6 +108,12 @@ JOINT_ACTION_VELOCITIES = (
 # Discount factor
 GAMMA = 0.99
 
+# Learning rate
+LEARNING_RATE = 1e-3
+
+# Number of training episodes
+NUM_TRAINING_EPISODES = 1000
+
 
 # --- Testing ---
 
