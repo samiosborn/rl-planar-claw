@@ -118,10 +118,7 @@ NUM_TRAINING_EPISODES = 10000
 REINFORCE_BATCH_SIZE = 20
 
 # Number of worker processes used to sample trajectories in parallel
-# (independent from REINFORCE_BATCH_SIZE: batch size sets the gradient
-# estimate, worker count sets throughput)
 REINFORCE_NUM_WORKERS = 8
-
 
 # --- Checkpoints ---
 
@@ -134,5 +131,8 @@ REINFORCE_CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints" / "reinforce"
 
 # --- Testing ---
 
-# Number of trajectories sampled for eval visualisation
+# Number of trajectories sampled for evaluation visualisation
 NUM_ROLLOUT_EPISODES = 30
+
+# Number of episodes for visualisation evaluation
+REINFORCE_EVALUATION_EPISODES = 3
