@@ -1,16 +1,14 @@
 # scripts/train_reinforce.py
 
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 
 import torch
 
 import config.simulation as CONFIG
 from src.algorithms.reinforce import PolicyNetwork, train_batch
-from src.env import PlanarClawEnv
+from src.parallel_rollout import init_worker
 
-
-# Initialise environment
-env = PlanarClawEnv(gui=False)
 
 # Initialise policy
 policy = PolicyNetwork()
@@ -53,6 +51,14 @@ def save_checkpoint(policy, optimiser, episodes_completed):
     print(f"Saved checkpoint: {checkpoint_path}")
 
 
+# Persistent worker pool for the whole training run
+# Each worker creates its own PyBullet environment and policy exactly once (see src/parallel_rollout.py)
+# No PyBullet connection is created in this process
+pool = ProcessPoolExecutor(
+    max_workers=CONFIG.REINFORCE_NUM_WORKERS,
+    initializer=init_worker,
+)
+
 try:
     # Initialise training progress
     episodes_completed = 0
@@ -83,13 +89,15 @@ try:
         episode_start = episodes_completed
         episode_end = episodes_completed + batch_size - 1
 
-        # Train policy on batch of trajectories
+        # Train policy on a batch of trajectories sampled in parallel
+        # seed_start = episodes_completed guarantees every episode in the run gets a unique seed
         diagnostics = train_batch(
-            env,
+            pool,
             policy,
             optimiser,
             CONFIG.GAMMA,
             batch_size,
+            episodes_completed,
         )
 
         # Update number of sampled episodes
@@ -121,5 +129,4 @@ try:
         update += 1
 
 finally:
-    env.close()
-    
+    pool.shutdown(wait=True)

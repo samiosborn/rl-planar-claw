@@ -117,6 +117,11 @@ NUM_TRAINING_EPISODES = 10000
 # Number of trajectories per policy gradient batch
 REINFORCE_BATCH_SIZE = 20
 
+# Number of worker processes used to sample trajectories in parallel
+# (independent from REINFORCE_BATCH_SIZE: batch size sets the gradient
+# estimate, worker count sets throughput)
+REINFORCE_NUM_WORKERS = 8
+
 
 # --- Checkpoints ---
 

@@ -1,5 +1,6 @@
 # src/algorithms/reinforce.py
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
@@ -7,8 +8,8 @@ from torch.distributions import Categorical
 import config.simulation as CONFIG
 
 
-class PolicyNetwork(nn.Module): 
-    def __init__(self): 
+class PolicyNetwork(nn.Module):
+    def __init__(self):
         super().__init__()
 
         # Hidden layer
@@ -19,7 +20,9 @@ class PolicyNetwork(nn.Module):
 
 
     # Forward pass
-    def forward(self, state: torch.Tensor) -> torch.Tensor: 
+    # Single state [OBSERVATION_DIM] returns logits [NUM_JOINTS, NUM_ACTIONS]
+    # Batch of T states [T, OBSERVATION_DIM] returns logits [T, NUM_JOINTS, NUM_ACTIONS]
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
         # Hidden layer (tanh activation)
         hidden = torch.tanh(self.hidden(state))
 
@@ -27,12 +30,17 @@ class PolicyNetwork(nn.Module):
         output = self.output(hidden)
 
         # Reshape into one categorical distribution per joint
-        logits = output.reshape(len(CONFIG.JOINTS), len(CONFIG.JOINT_ACTION_VELOCITIES)) 
+        # Preserves any leading batch dimension
+        logits = output.reshape(
+            *state.shape[:-1],
+            len(CONFIG.JOINTS),
+            len(CONFIG.JOINT_ACTION_VELOCITIES),
+        )
 
         return logits
 
 
-# Sample action from policy
+# Sample action from policy for a single state
 def sample_action(policy: PolicyNetwork, state: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     # Get policy logits
     logits = policy.forward(state)
@@ -52,6 +60,24 @@ def sample_action(policy: PolicyNetwork, state: torch.Tensor) -> tuple[torch.Ten
     return actions, log_prob
 
 
+# Score already-chosen actions under the current policy
+# Used to recompute log pi_theta(a_t | s_t) with autograd from stored trajectory data
+# states: [T, OBSERVATION_DIM], actions: [T, NUM_JOINTS]
+# Returns log pi(a_t | s_t) for each timestep: [T]
+def compute_action_log_probs(policy: PolicyNetwork, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    # Logits for every timestep in one forward pass: [T, NUM_JOINTS, NUM_ACTIONS]
+    logits = policy.forward(states)
+
+    # Categorical distribution per joint, per timestep
+    distribution = Categorical(logits=logits)
+
+    # Log probability of each joint's chosen action: [T, NUM_JOINTS]
+    joint_log_probs = distribution.log_prob(actions)
+
+    # log pi(a_t | s_t) = sum_j log pi(a_t,j | s_t): [T]
+    return joint_log_probs.sum(dim=-1)
+
+
 # Compute returns-to-go
 def compute_returns(rewards, gamma):
     # Initialise
@@ -69,89 +95,98 @@ def compute_returns(rewards, gamma):
     return returns
 
 
-# Compute policy loss
-def compute_policy_loss(log_probs, returns): 
-    # Convert into a single tensor
-    log_probs = torch.stack(log_probs)
-    returns = torch.tensor(returns, dtype=torch.float32)
-
-    # Monte Carlo policy objective (J)
+# Compute policy loss from per-timestep log-probabilities and returns-to-go
+def compute_policy_loss(log_probs: torch.Tensor, returns: torch.Tensor) -> torch.Tensor:
+    # Monte Carlo policy objective (J) = sum_t G_t log pi(a_t | s_t)
     policy_objective = (log_probs * returns).sum()
 
     # Gradient descent on negative objective = gradient ascent on objective
     return -policy_objective
 
 
-# Sample one complete episode and compute its REINFORCE loss
-def run_episode(env, policy, gamma):
-    # Reset environment
-    state = env.reset()
+# Compute the REINFORCE loss for one complete trajectory
+# L_i = -sum_t G_i,t log pi_theta(a_i,t | s_i,t)
+# Recomputes log pi_theta(a_t | s_t) from the stored states and actions with autograd enabled
+# So the loss is differentiable with respect to the current (live) policy parameters
+def compute_trajectory_loss(policy: PolicyNetwork, trajectory: dict, gamma: float) -> torch.Tensor:
+    # Returns-to-go for this trajectory
+    returns = torch.tensor(
+        compute_returns(trajectory["rewards"], gamma),
+        dtype=torch.float32,
+    )
 
-    # Initialise rewards and log-probabilities
-    rewards = []
-    log_probs = []
+    # Stored states and actions as tensors, via a single numpy array first
+    # Converting a list of arrays straight to a tensor is far slower
+    states = torch.tensor(np.array(trajectory["states"]), dtype=torch.float32)
+    actions = torch.tensor(np.array(trajectory["actions"]), dtype=torch.long)
 
-    # Reset episode
-    done = False
+    # Recompute log pi_theta(a_t | s_t) for every timestep in one forward pass
+    log_probs = compute_action_log_probs(policy, states, actions)
 
-    # Loop until done
-    while not done:
-        # Convert state into tensor
-        state_tensor = torch.tensor(state, dtype=torch.float32)
+    return compute_policy_loss(log_probs, returns)
 
-        # Sample action from policy
-        action, log_prob = sample_action(policy, state_tensor)
 
-        # State transition following action (converted to list first)
-        next_state, reward, done = env.step(action.tolist())
+# Sequential debug path, without multiprocessing
+# Useful for comparing against the parallel path
+def run_episode(env, policy: PolicyNetwork, gamma: float):
+    # Local import avoids a circular import
+    # src.rollout imports sample_action from this module
+    from src.rollout import sample_episode
 
-        # Append
-        rewards.append(reward)
-        log_probs.append(log_prob)
+    trajectory = sample_episode(env, policy)
+    loss = compute_trajectory_loss(policy, trajectory, gamma)
 
-        # Update current state
-        state = next_state
-
-    # Compute returns
-    returns = compute_returns(rewards, gamma)
-
-    # Compute policy loss (sum over timesteps)
-    loss = compute_policy_loss(log_probs, returns)
-
-    # Debug outputs (loss kept as a tensor so it can still be backpropagated)
-    return {
-        "loss": loss,
-        "episode_length": len(rewards),
-        "undiscounted_return": sum(rewards),
-        "discounted_return": returns[0],
-    }
+    return trajectory, loss
 
 
 # Train policy from a batch of complete trajectories (Monte Carlo REINFORCE)
-def train_batch(env, policy, optimiser, gamma, batch_size):
+# Trajectories are sampled in parallel across worker processes
+# Gradient estimator: -(1/N) sum_i sum_t G_i,t grad log pi_theta(a_i,t | s_i,t)
+# Gradient descent on this negative objective corresponds to policy-gradient ascent
+def train_batch(pool, policy: PolicyNetwork, optimiser, gamma: float, batch_size: int, seed_start: int):
+    # Local import avoids a circular import
+    # src.parallel_rollout imports src.rollout, which imports sample_action from this module
+    from src.parallel_rollout import collect_trajectories_parallel
+
     # Clear gradients once for the whole batch
     optimiser.zero_grad()
 
-    # Initialise per-episode diagnostics
+    # Freeze one explicit CPU copy of the current policy parameters
+    # Every trajectory in this batch is sampled from this exact snapshot
+    # This keeps the batch strictly on-policy
+    policy_state_dict = {
+        name: tensor.detach().cpu().clone()
+        for name, tensor in policy.state_dict().items()
+    }
+
+    # Sample batch_size complete trajectories in parallel, under torch.no_grad()
+    trajectories = collect_trajectories_parallel(
+        pool,
+        policy_state_dict,
+        batch_size,
+        seed_start,
+    )
+
+    # Initialise per-trajectory diagnostics
     losses = []
     episode_lengths = []
     undiscounted_returns = []
     discounted_returns = []
 
-    # Sample batch_size complete episodes
-    for _ in range(batch_size):
-        # Collect one trajectory and its REINFORCE loss
-        episode = run_episode(env, policy, gamma)
+    # Recompute log pi_theta(a_t | s_t) with autograd and accumulate gradients
+    for trajectory in trajectories:
+        # Recompute the REINFORCE loss for this trajectory against the current (live) policy
+        loss = compute_trajectory_loss(policy, trajectory, gamma)
 
-        # Average trajectory losses by backpropagating loss / batch_size
-        # for each trajectory; PyTorch accumulates the resulting gradients
-        (episode["loss"] / batch_size).backward()
+        # Average trajectory losses by backpropagating loss / N for each trajectory
+        # PyTorch accumulates the resulting gradients
+        (loss / len(trajectories)).backward()
 
         # Record diagnostics
-        losses.append(episode["loss"].item())
-        episode_lengths.append(episode["episode_length"])
-        undiscounted_returns.append(episode["undiscounted_return"])
-        discounted_returns.append(episode["discounted_return"])
+        losses.append(loss.item())
+        episode_lengths.append(trajectory["episode_length"])
+        undiscounted_returns.append(sum(trajectory["rewards"]))
+        discounted_returns.append(compute_returns(trajectory["rewards"], gamma)[0])
 
     # Gradient norm, computed after all trajectory gradients have accumulated
     gradient_norm_squared = 0.0
@@ -165,11 +200,11 @@ def train_batch(env, policy, optimiser, gamma, batch_size):
 
     # Debug outputs
     return {
-        "num_episodes": batch_size,
+        "num_episodes": len(trajectories),
         "episode_lengths": episode_lengths,
-        "mean_loss": sum(losses) / batch_size,
-        "mean_undiscounted_return": sum(undiscounted_returns) / batch_size,
-        "mean_discounted_return": sum(discounted_returns) / batch_size,
+        "mean_loss": sum(losses) / len(trajectories),
+        "mean_undiscounted_return": sum(undiscounted_returns) / len(trajectories),
+        "mean_discounted_return": sum(discounted_returns) / len(trajectories),
         "min_discounted_return": min(discounted_returns),
         "max_discounted_return": max(discounted_returns),
         "gradient_norm": gradient_norm_squared ** 0.5,
