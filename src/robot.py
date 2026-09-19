@@ -3,30 +3,13 @@
 import pybullet as p
 
 import config.simulation as CONFIG
+from src.scene import get_joint_indices
 
 
 class PlanarClaw: 
     def __init__(self, body_id: int): 
         self.body_id = body_id
-        self.joint_indices = self._get_joint_indices()
-
-
-    # --- Helper ---
-
-    # Return joint indices as a dictionary
-    def _get_joint_indices(self) -> dict[str, int]:
-        joint_indices = {}
-
-        # Loop over joints
-        for joint_index in range(p.getNumJoints(self.body_id)):
-            joint_info = p.getJointInfo(self.body_id, joint_index)
-
-            # Decode name
-            joint_name = joint_info[1].decode("utf-8")
-
-            joint_indices[joint_name] = joint_index
-
-        return joint_indices
+        self.joint_indices = get_joint_indices(body_id)
 
 
     # --- API ---

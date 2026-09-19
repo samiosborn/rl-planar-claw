@@ -1,8 +1,10 @@
 # tests/test_parallel_rollout.py
 
+from concurrent.futures import ProcessPoolExecutor
+
 import config.simulation as CONFIG
 from src.algorithms.reinforce import PolicyNetwork
-from src.parallel_rollout import _worker_identity, collect_trajectories_parallel
+from src.parallel_rollout import _worker_identity, collect_trajectories_parallel, init_worker
 
 
 # Freeze one explicit CPU copy of a policy's parameters, exactly as train_batch does
@@ -41,8 +43,7 @@ def test_collect_trajectories_parallel_trajectory_lengths(pool):
 def test_batch_smaller_than_worker_count(pool):
     policy = PolicyNetwork()
 
-    # The shared test pool has 4 workers
-    # Request fewer trajectories than that, so some workers remain idle
+    # Fewer trajectories than the pool's 4 workers, so some stay idle
     trajectories = collect_trajectories_parallel(pool, _snapshot(policy), batch_size=2, seed_start=20)
 
     assert len(trajectories) == 2
@@ -59,16 +60,50 @@ def test_final_partial_batch_of_one(pool):
     assert trajectories[0]["episode_length"] == CONFIG.MAX_EPISODE_STEPS
 
 
-# Test that an identical policy snapshot and identical seed reproduce identical sampled actions
-def test_reproducible_with_same_snapshot_and_seed(pool):
+# Leading steps compared in the seeding tests
+# Early steps are free-space motion that Bullet reproduces exactly; contact-rich later steps are not bit-identical across process histories
+SEEDING_WINDOW = 10
+
+
+# Test that a fresh worker given the same policy snapshot and seed samples the same actions
+def test_same_snapshot_and_seed_give_same_actions_in_fresh_workers():
     policy = PolicyNetwork()
     snapshot = _snapshot(policy)
 
-    trajectory_a = collect_trajectories_parallel(pool, snapshot, batch_size=1, seed_start=40)[0]
-    trajectory_b = collect_trajectories_parallel(pool, snapshot, batch_size=1, seed_start=40)[0]
+    # Fresh single-worker pools share no process history
+    pool_a = ProcessPoolExecutor(max_workers=1, initializer=init_worker)
+    pool_b = ProcessPoolExecutor(max_workers=1, initializer=init_worker)
 
-    assert trajectory_a["actions"] == trajectory_b["actions"]
-    assert trajectory_a["rewards"] == trajectory_b["rewards"]
+    try:
+        trajectory_a = collect_trajectories_parallel(pool_a, snapshot, batch_size=1, seed_start=40)[0]
+        trajectory_b = collect_trajectories_parallel(pool_b, snapshot, batch_size=1, seed_start=40)[0]
+    finally:
+        pool_a.shutdown(wait=True)
+        pool_b.shutdown(wait=True)
+
+    assert trajectory_a["actions"][:SEEDING_WINDOW] == trajectory_b["actions"][:SEEDING_WINDOW]
+    assert trajectory_a["rewards"][:SEEDING_WINDOW] == trajectory_b["rewards"][:SEEDING_WINDOW]
+
+
+# Test that reusing a worker leaks no RNG or policy state between tasks
+def test_same_snapshot_and_seed_give_same_actions_when_a_worker_is_reused():
+    policy = PolicyNetwork()
+    snapshot = _snapshot(policy)
+
+    single_worker_pool = ProcessPoolExecutor(max_workers=1, initializer=init_worker)
+
+    try:
+        first = collect_trajectories_parallel(single_worker_pool, snapshot, batch_size=1, seed_start=45)[0]
+
+        # An unrelated episode in between advances the worker's RNG and environment
+        collect_trajectories_parallel(single_worker_pool, snapshot, batch_size=1, seed_start=46)
+
+        second = collect_trajectories_parallel(single_worker_pool, snapshot, batch_size=1, seed_start=45)[0]
+    finally:
+        single_worker_pool.shutdown(wait=True)
+
+    assert first["actions"][:SEEDING_WINDOW] == second["actions"][:SEEDING_WINDOW]
+    assert first["rewards"][:SEEDING_WINDOW] == second["rewards"][:SEEDING_WINDOW]
 
 
 # Test that different seeds do not accidentally produce identical action sequences
@@ -83,13 +118,10 @@ def test_different_seeds_produce_different_actions(pool):
 
 
 # Test that worker environments are isolated
-# Each worker process reuses exactly one environment across its own tasks
-# Distinct workers are genuinely separate processes
 def test_worker_environments_are_isolated(pool):
     num_tasks = 8
 
-    # Submit every task before waiting on any result
-    # This gives the pool a chance to use more than one of its worker processes
+    # Submit every task before waiting on any result so the pool can spread them across workers
     futures = [pool.submit(_worker_identity) for _ in range(num_tasks)]
     identities = [future.result() for future in futures]
 

@@ -2,48 +2,54 @@
 
 import pybullet as p
 
+import config.simulation as CONFIG
+from src.scene import get_joint_indices
+
 
 class Cube:
     def __init__(self, body_id: int):
         self.body_id = body_id
+        self.joint_indices = get_joint_indices(body_id)
+
+        self._disable_motors()
 
 
-    # Yaw angle
-    def get_yaw(self) -> float:
-        _, orientation = p.getBasePositionAndOrientation(self.body_id)
-        _, _, yaw = p.getEulerFromQuaternion(orientation)
-        return yaw
+    # --- Helper ---
+
+    # Keep the cube joints passive so gravity and contact drive them, not PyBullet's default velocity motor
+    def _disable_motors(self) -> None:
+        for joint_name in CONFIG.CUBE_JOINTS:
+            p.setJointMotorControl2(
+                bodyUniqueId=self.body_id,
+                jointIndex=self.joint_indices[joint_name],
+                controlMode=p.VELOCITY_CONTROL,
+                force=0.0)
 
 
-    # Get state
-    def get_state(self):
-        position, orientation = p.getBasePositionAndOrientation(self.body_id)
-        linear_velocity, angular_velocity = p.getBaseVelocity(self.body_id)
+    # --- API ---
 
-        _, _, yaw = p.getEulerFromQuaternion(orientation)
-
-        return position, yaw, linear_velocity, angular_velocity
+    # Read the angle directly from the x joint to avoid Euler conversion
+    def get_angle(self) -> float:
+        return p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[0]
 
 
-    # Reset to a specified position and yaw angle
-    def reset(
-        self,
-        position: tuple[float, float, float],
-        yaw: float,
-    ) -> None:
+    # Returns y, z, theta, vy, vz, angular velocity about x
+    def get_state(self) -> tuple[float, float, float, float, float, float]:
+        y, vy = p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_Y])[:2]
+        z, vz = p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_Z])[:2]
+        theta, omega = p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[:2]
 
-        # Orientation (quaternion)
-        orientation = p.getQuaternionFromEuler((0.0, 0.0, yaw))
+        return y, z, theta, vy, vz, omega
 
-        # Reset position and orientation
-        p.resetBasePositionAndOrientation(
-            self.body_id,
-            posObj=position,
-            ornObj=orientation)
 
-        # Reset linear and angular velocity to zero
-        p.resetBaseVelocity(
-            self.body_id,
-            linearVelocity=(0.0, 0.0, 0.0),
-            angularVelocity=(0.0, 0.0, 0.0))
-    
+    # Reset to the given pose with zero velocity
+    def reset(self, y: float, z: float, theta: float) -> None:
+        for joint_name, position in zip(CONFIG.CUBE_JOINTS, (y, z, theta)):
+            p.resetJointState(
+                self.body_id,
+                self.joint_indices[joint_name],
+                targetValue=position,
+                targetVelocity=0.0)
+
+        # Re-apply in case the reset re-engaged a motor
+        self._disable_motors()

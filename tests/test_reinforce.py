@@ -16,7 +16,7 @@ from src.algorithms.reinforce import (
     train_batch,
 )
 from src.env import PlanarClawEnv
-from src.rollout import sample_episode
+from src.parallel_rollout import collect_trajectories_parallel
 
 
 # Test policy output for a single state
@@ -81,7 +81,6 @@ def test_sample_action():
 
 
 # Test that the vectorised trajectory log-probabilities equal an independent reconstruction
-# Reconstructed timestep-by-timestep using the same Categorical distribution
 def test_compute_action_log_probs_matches_timestep_by_timestep():
     policy = PolicyNetwork()
 
@@ -97,8 +96,6 @@ def test_compute_action_log_probs_matches_timestep_by_timestep():
     assert vectorised_log_probs.shape == (T,)
 
     # Timestep-by-timestep reconstruction, matching the single-state formula
-    # logits = policy(state)
-    # log_prob = Categorical(logits=logits).log_prob(action).sum()
     for t in range(T):
         logits = policy.forward(states[t])
         distribution = Categorical(logits=logits)
@@ -108,7 +105,6 @@ def test_compute_action_log_probs_matches_timestep_by_timestep():
 
 
 # Test that compute_trajectory_loss equals an independently reconstructed loss
-# -sum_t G_t log pi(a_t | s_t)
 def test_compute_trajectory_loss_matches_manual_reconstruction():
     policy = PolicyNetwork()
     gamma = 0.9
@@ -209,8 +205,7 @@ def test_train_batch_smaller_than_worker_count(pool):
     policy = PolicyNetwork()
     optimiser = torch.optim.Adam(policy.parameters(), lr=0.001)
 
-    # The shared test pool has 4 workers
-    # Use a smaller batch
+    # Fewer episodes than the pool's 4 workers
     diagnostics = train_batch(pool, policy, optimiser, CONFIG.GAMMA, batch_size=2, seed_start=2000)
 
     assert diagnostics["num_episodes"] == 2
@@ -228,37 +223,42 @@ def test_train_batch_final_partial_batch(pool):
     assert math.isfinite(diagnostics["gradient_norm"])
 
 
-# Test that train_batch's reported mean discounted return matches trajectories
-# Sampled sequentially from the identical frozen snapshot and identical seeds
-def test_train_batch_mean_return_matches_episodes(pool):
+# Make train_batch reuse already-sampled trajectories, isolating the RL maths from PyBullet
+# The stand-in also checks train_batch passes the collector the pool, frozen snapshot, batch size and seed
+def _replay_trajectories(monkeypatch, trajectories, pool, policy_state_dict, batch_size, seed_start):
+    def fake_collect_trajectories_parallel(pool_argument, snapshot_argument, batch_size_argument, seed_start_argument):
+        assert pool_argument is pool
+        assert batch_size_argument == batch_size
+        assert seed_start_argument == seed_start
+        assert snapshot_argument.keys() == policy_state_dict.keys()
+        assert all(torch.equal(snapshot_argument[name], policy_state_dict[name]) for name in policy_state_dict)
+
+        return trajectories
+
+    monkeypatch.setattr("src.parallel_rollout.collect_trajectories_parallel", fake_collect_trajectories_parallel)
+
+
+# Test that train_batch's reported mean discounted return matches its own sampled trajectories
+def test_train_batch_mean_return_matches_episodes(pool, monkeypatch):
     policy = PolicyNetwork()
     optimiser = torch.optim.Adam(policy.parameters(), lr=0.001)
     batch_size = 3
     seed_start = 4000
 
-    # Freeze the exact same snapshot train_batch will freeze internally
     policy_state_dict = {
         name: tensor.detach().cpu().clone()
         for name, tensor in policy.state_dict().items()
     }
 
-    # Independently reconstruct the trajectories train_batch will sample
-    # Sample sequentially from the identical snapshot and identical seeds
-    # Mirror the worker task exactly, with one persistent policy object reloaded on every episode
-    # A fresh PolicyNetwork() per episode would itself consume RNG state and break reproducibility
-    reference_env = PlanarClawEnv(gui=False)
-    sampling_policy = PolicyNetwork()
-    try:
-        reference_returns = []
+    # Sample once so both computations below use identical trajectories
+    trajectories = collect_trajectories_parallel(pool, policy_state_dict, batch_size, seed_start)
 
-        for episode_index in range(batch_size):
-            torch.manual_seed(seed_start + episode_index)
-            sampling_policy.load_state_dict(policy_state_dict)
+    reference_returns = [
+        compute_returns(trajectory["rewards"], CONFIG.GAMMA)[0]
+        for trajectory in trajectories
+    ]
 
-            trajectory = sample_episode(reference_env, sampling_policy)
-            reference_returns.append(compute_returns(trajectory["rewards"], CONFIG.GAMMA)[0])
-    finally:
-        reference_env.close()
+    _replay_trajectories(monkeypatch, trajectories, pool, policy_state_dict, batch_size, seed_start)
 
     diagnostics = train_batch(pool, policy, optimiser, CONFIG.GAMMA, batch_size, seed_start)
 
@@ -272,8 +272,7 @@ def test_train_batch_mean_return_matches_episodes(pool):
 
 
 # Test that gradient accumulation over a parallel batch matches averaging trajectory losses
-# Sampled sequentially from the same snapshot and seeds
-def test_train_batch_gradient_matches_averaged_losses(pool):
+def test_train_batch_gradient_matches_averaged_losses(pool, monkeypatch):
     batch_size = 2
     seed_start = 5000
 
@@ -285,42 +284,29 @@ def test_train_batch_gradient_matches_averaged_losses(pool):
         for name, tensor in policy.state_dict().items()
     }
 
-    # Reference: sample trajectories sequentially from the identical frozen snapshot and seeds
-    # Mirror the worker task exactly, with one persistent policy object reloaded on every episode
-    # See test_train_batch_mean_return_matches_episodes
-    reference_env = PlanarClawEnv(gui=False)
-    sampling_policy = PolicyNetwork()
-    try:
-        reference_trajectories = []
+    # Sample once so both computations below use identical trajectories
+    trajectories = collect_trajectories_parallel(pool, policy_state_dict, batch_size, seed_start)
 
-        for episode_index in range(batch_size):
-            torch.manual_seed(seed_start + episode_index)
-            sampling_policy.load_state_dict(policy_state_dict)
-
-            reference_trajectories.append(sample_episode(reference_env, sampling_policy))
-    finally:
-        reference_env.close()
-
-    # Average trajectory losses computed against the live (grad-tracking) policy
-    # Exactly as train_batch does internally
+    # Reference: average trajectory losses computed against the live (grad-tracking) policy
     reference_losses = [
         compute_trajectory_loss(policy, trajectory, CONFIG.GAMMA)
-        for trajectory in reference_trajectories
+        for trajectory in trajectories
     ]
     averaged_loss = sum(reference_losses) / batch_size
     averaged_loss.backward()
 
     reference_gradients = [parameter.grad.detach().clone() for parameter in policy.parameters()]
 
-    # train_batch: accumulate gradients from trajectories collected in parallel
+    _replay_trajectories(monkeypatch, trajectories, pool, policy_state_dict, batch_size, seed_start)
+
+    # train_batch: accumulate gradients from the same trajectories, via its own code path
     train_batch(pool, policy, optimiser, CONFIG.GAMMA, batch_size, seed_start)
 
     batch_gradients = [parameter.grad.detach().clone() for parameter in policy.parameters()]
 
-    # The two gradient accumulation strategies must match
-    # Allowing for floating-point summation order differences between backward() calls
+    # Same maths on the same trajectories; only float32 summation order differs
     for reference_grad, batch_grad in zip(reference_gradients, batch_gradients):
-        assert torch.allclose(reference_grad, batch_grad, rtol=1e-4, atol=1e-3)
+        assert torch.allclose(reference_grad, batch_grad, rtol=1e-5, atol=1e-6)
 
 
 # Test that exactly one optimiser step is taken per batch, not one per trajectory

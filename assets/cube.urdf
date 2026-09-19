@@ -1,31 +1,109 @@
 <!-- assets/cube.urdf -->
+<!-- Passive planar mechanism, not a free body: fixed mount -> prismatic y -> prismatic z -> continuous revolute x -> cube_link
+    x translation and rotation about y/z are structurally impossible, and gravity and contact drive the remaining three DoF
+    All three joint motors must be disabled after loading (see src/cube.py)
+
+    The two carriage links exist only to carry the prismatic joints
+    They have a token 1e-4 kg (0.1% of the cube) so the solver never sees a massless link without visibly slowing the cube
+    They never rotate, so their inertia is irrelevant -->
 <robot name="cube" version="1.0">
+
+    <material name="cube_colour">
+        <color rgba="0.75 0.25 0.25 1"/>
+    </material>
+
+    <link name="cube_mount">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="1.0"/>
+            <inertia
+                ixx="1.0"
+                ixy="0.0"
+                ixz="0.0"
+                iyy="1.0"
+                iyz="0.0"
+                izz="1.0"/>
+        </inertial>
+    </link>
+
+    <joint name="cube_slider_y" type="prismatic">
+        <parent link="cube_mount"/>
+        <child link="cube_slider_y_link"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <limit lower="-0.4" upper="0.4" effort="1000" velocity="10"/>
+        <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="cube_slider_y_link">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.0001"/>
+            <inertia
+                ixx="0.000000001"
+                ixy="0.0"
+                ixz="0.0"
+                iyy="0.000000001"
+                iyz="0.0"
+                izz="0.000000001"/>
+        </inertial>
+    </link>
+
+    <joint name="cube_slider_z" type="prismatic">
+        <parent link="cube_slider_y_link"/>
+        <child link="cube_slider_z_link"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="-0.05" upper="0.5" effort="1000" velocity="10"/>
+        <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="cube_slider_z_link">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.0001"/>
+            <inertia
+                ixx="0.000000001"
+                ixy="0.0"
+                ixz="0.0"
+                iyy="0.000000001"
+                iyz="0.0"
+                izz="0.000000001"/>
+        </inertial>
+    </link>
+
+    <joint name="cube_joint_x" type="continuous">
+        <parent link="cube_slider_z_link"/>
+        <child link="cube_link"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <limit effort="1000" velocity="100"/>
+        <dynamics damping="0.0" friction="0.0"/>
+    </joint>
 
     <link name="cube_link">
         <visual>
             <geometry>
-                <box size="0.08 0.08 0.02"/>
+                <box size="0.02 0.08 0.08"/>
             </geometry>
-            <material name="cube_colour">
-                <color rgba="0.75 0.25 0.25 1"/>
-            </material>
+            <material name="cube_colour"/>
         </visual>
 
         <collision>
             <geometry>
-                <box size="0.08 0.08 0.02"/>
+                <box size="0.02 0.08 0.08"/>
             </geometry>
         </collision>
 
         <inertial>
             <mass value="0.10"/>
             <inertia
-                ixx="0.000057"
+                ixx="0.000107"
                 ixy="0"
                 ixz="0"
                 iyy="0.000057"
                 iyz="0"
-                izz="0.000107"/>
+                izz="0.000057"/>
         </inertial>
     </link>
 
