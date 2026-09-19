@@ -389,6 +389,105 @@ def test_mirrored_right_finger_contact_rotates_cube_the_opposite_way(env):
     assert np.sign(left_extreme) == -np.sign(right_extreme)
 
 
+# --- Contact friction ---
+
+
+# PyBullet's default lateral friction, i.e. the behaviour before the friction config was added
+DEFAULT_LATERAL_FRICTION = 0.5
+
+
+# The live PyBullet dynamics must carry the configured friction on every collision link
+def test_contact_dynamics_are_applied_to_live_bodies(env):
+    cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
+
+    bodies = [(env.plane_id, -1, CONFIG.PLANE_LATERAL_FRICTION), (env.cube_id, cube_link, CONFIG.CUBE_LATERAL_FRICTION)]
+    bodies += [(env.claw_id, link, CONFIG.FINGER_LATERAL_FRICTION) for link in LEFT_LINKS + RIGHT_LINKS]
+
+    for body_id, link_index, lateral_friction in bodies:
+        info = p.getDynamicsInfo(body_id, link_index)
+
+        assert info[1] == pytest.approx(lateral_friction)
+        assert info[5] == pytest.approx(CONFIG.RESTITUTION)
+        assert info[6] == pytest.approx(CONFIG.ROLLING_FRICTION)
+        assert info[7] == pytest.approx(CONFIG.SPINNING_FRICTION)
+
+    # The dynamics link is the real cube (0.1 kg), not the mount or a carriage
+    assert p.getDynamicsInfo(env.cube_id, cube_link)[0] == pytest.approx(0.1)
+
+    # Sane values, not extreme grip
+    assert all(friction <= 2.0 for _, _, friction in bodies)
+
+
+# Push the upper face of the cube with the left finger using only the real actions: approach clear of the cube, then push
+# The cube's pose is never set after reset, so any rotation comes from claw contact
+def _push_upper_face(env, plane, cube, finger, approach=(-0.8, 1.0, 0.0), push=(-0.3, 1.0, 0.0)):
+    env.reset()
+
+    cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
+    p.changeDynamics(env.plane_id, -1, lateralFriction=plane)
+    p.changeDynamics(env.cube_id, cube_link, lateralFriction=cube)
+
+    for link in LEFT_LINKS + RIGHT_LINKS:
+        p.changeDynamics(env.claw_id, link, lateralFriction=finger)
+
+    targets = np.array([CONFIG.INITIAL_JOINT_POSITIONS[name] for name in CONFIG.JOINTS])
+    contact_before_push = False
+    contact = False
+    thetas = []
+    ys = []
+
+    for step in range(150):
+        targets[:3] = approach if step < 60 else push
+        _step_toward(env, targets)
+
+        touching = bool(p.getContactPoints(env.claw_id, env.cube_id))
+        contact_before_push |= touching and step < 60
+        contact |= touching
+
+        thetas.append(env.cube.get_angle())
+        ys.append(env.cube.get_state()[0])
+
+    return dict(
+        contact=contact,
+        contact_before_push=contact_before_push,
+        max_theta=float(np.max(np.abs(thetas))),
+        final_theta=thetas[-1],
+        max_y=float(np.max(np.abs(ys))),
+        final_y=ys[-1])
+
+
+# The same off-centre push slides the cube under default friction but tips it under the configured friction
+def test_configured_friction_tips_the_cube_instead_of_sliding_it(env):
+    before = _push_upper_face(env, *[DEFAULT_LATERAL_FRICTION] * 3)
+    after = _push_upper_face(
+        env, CONFIG.PLANE_LATERAL_FRICTION, CONFIG.CUBE_LATERAL_FRICTION, CONFIG.FINGER_LATERAL_FRICTION)
+
+    for result in (before, after):
+        assert result["contact"] and not result["contact_before_push"]
+        assert np.isfinite(result["max_theta"]) and np.isfinite(result["final_y"])
+
+    # Before: the cube is mostly shoved sideways
+    assert before["max_theta"] < math.radians(10)
+    assert before["max_y"] > 0.04
+
+    # After: it genuinely rotates (and so is not jammed), while sliding no further than before
+    assert after["max_theta"] > math.radians(30)
+    assert after["max_theta"] < math.radians(90)
+    assert after["max_y"] <= before["max_y"]
+
+    # Rotation per metre of sliding rises by a large factor
+    assert after["max_theta"] / after["max_y"] > 10 * before["max_theta"] / before["max_y"]
+
+
+# Friction must not be so high that a finger glues to the cube: the pushed cube has to move
+def test_fingers_do_not_jam_the_cube(env):
+    result = _push_upper_face(
+        env, CONFIG.PLANE_LATERAL_FRICTION, CONFIG.CUBE_LATERAL_FRICTION, CONFIG.FINGER_LATERAL_FRICTION)
+
+    assert result["max_y"] > 0.02
+    assert result["max_theta"] > math.radians(10)
+
+
 # --- Teleop tool ---
 # The GUI cannot be opened headlessly, so only the static parts are checked
 

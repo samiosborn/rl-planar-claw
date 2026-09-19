@@ -27,6 +27,22 @@ PHYSICS_STEPS_PER_CONTROL = PHYSICS_HZ // CONTROL_HZ
 # PyBullet's default of 50 lets joint limits slip by ~1 rad when the fingers press together; 200 keeps it within ~0.03 rad
 SOLVER_ITERATIONS = 200
 
+# Contact friction (PyBullet's default lateral friction is 0.5 for every body)
+# PyBullet multiplies the two bodies' coefficients: floor-cube is 1.0 * 1.2 = 1.2 and finger-cube is 0.3 * 1.2 = 0.36
+# A grippy floor resists sliding so an off-centre push tips the cube about its floor edge
+PLANE_LATERAL_FRICTION = 1.0
+CUBE_LATERAL_FRICTION = 1.2
+
+# Fingers stay slippery: at 1.0 an upper-face push jams the cube completely (no motion at all), so the fingers glue to it
+FINGER_LATERAL_FRICTION = 0.3
+
+# Rolling friction would resist the cube's rotation about x, so it stays off; spinning friction is irrelevant in a plane
+ROLLING_FRICTION = 0.0
+SPINNING_FRICTION = 0.0
+
+# Low restitution so contacts are not bouncy
+RESTITUTION = 0.0
+
 
 # --- Claw ---
 
