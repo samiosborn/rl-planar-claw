@@ -20,23 +20,20 @@ REINFORCE_CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints" / "reinforce"
 # Gravitational field strength (N/kg)
 GRAVITY = 9.81
 
+# Frequencies
 PHYSICS_HZ = 240
 CONTROL_HZ = 30
 PHYSICS_STEPS_PER_CONTROL = PHYSICS_HZ // CONTROL_HZ
 
-# PyBullet's default of 50 lets joint limits slip by ~1 rad when the fingers press together; 200 keeps it within ~0.03 rad
+# PyBullet's Solver Iterations
 SOLVER_ITERATIONS = 200
 
-# Contact friction (PyBullet's default lateral friction is 0.5 for every body)
-# PyBullet multiplies the two bodies' coefficients: floor-cube is 1.0 * 1.2 = 1.2 and finger-cube is 0.3 * 1.2 = 0.36
-# A grippy floor resists sliding so an off-centre push tips the cube about its floor edge
+# Contact friction
 PLANE_LATERAL_FRICTION = 1.0
 CUBE_LATERAL_FRICTION = 1.2
 
-# Fingers stay slippery: at 1.0 an upper-face push jams the cube completely (no motion at all), so the fingers glue to it
+# Friction
 FINGER_LATERAL_FRICTION = 0.3
-
-# Rolling friction would resist the cube's rotation about x, so it stays off; spinning friction is irrelevant in a plane
 ROLLING_FRICTION = 0.0
 SPINNING_FRICTION = 0.0
 
@@ -77,7 +74,6 @@ INITIAL_JOINT_POSITIONS = {
 MAX_JOINT_VELOCITY = 2.0
 
 # Max joint torque (Nm)
-# Much higher (e.g. 10) overpowers PyBullet's soft joint limits at these link inertias and drives the outer joints ~1 rad past them
 MAX_JOINT_TORQUE = 2.0
 
 
@@ -89,7 +85,7 @@ CUBE_JOINT_Z = "cube_slider_z"
 CUBE_JOINT_ANGLE = "cube_joint_x"
 CUBE_JOINTS = (CUBE_JOINT_Y, CUBE_JOINT_Z, CUBE_JOINT_ANGLE)
 
-# Initial cube pose: y and z in metres, angle about world x in radians
+# Initial cube pose
 CUBE_INITIAL_Y = 0.0
 CUBE_INITIAL_Z = 0.04
 CUBE_INITIAL_ANGLE = 0.0
@@ -117,9 +113,14 @@ JOINT_ACTION_VELOCITIES = (
 
 # --- REINFORCE ---
 
+# Discount factor
 GAMMA = 0.99
+
+# Learning rate
 LEARNING_RATE = 1e-3
-NUM_TRAINING_EPISODES = 15000
+
+# Number of training episodes
+NUM_TRAINING_EPISODES = 25000
 
 # Trajectories per policy-gradient update
 REINFORCE_BATCH_SIZE = 20
@@ -128,7 +129,7 @@ REINFORCE_BATCH_SIZE = 20
 REINFORCE_NUM_WORKERS = 8
 
 # Save a checkpoint every N training episodes
-CHECKPOINT_INTERVAL_EPISODES = 450
+CHECKPOINT_INTERVAL_EPISODES = 1000
 
 
 # --- Evaluation / visualisation ---
@@ -137,9 +138,9 @@ CHECKPOINT_INTERVAL_EPISODES = 450
 NUM_ROLLOUT_EPISODES = 30
 
 # Episodes shown when watching a checkpoint
-REINFORCE_EVALUATION_EPISODES = 3
+REINFORCE_EVALUATION_EPISODES = 5
 
-# GUI camera looks along world -x, so y runs left to right and z is vertical
+# GUI Camera
 CAMERA_DISTANCE = 0.7
 CAMERA_YAW = 90
 CAMERA_PITCH = 0
