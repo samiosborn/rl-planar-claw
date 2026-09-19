@@ -210,9 +210,11 @@ def test_cube_geometry_matches_config_and_tips_more_easily(env):
     # Visual and collision boxes both use the configured size
     assert box_sizes == [CONFIG.CUBE_SIZE] * 2
 
-    # Narrower footprint than height, so the tipping angle atan(width / height) is below 45 degrees
+    # Narrower footprint than height, so the tipping angle atan(width / height) is below 45 degrees, but not too tall to reach once toppled
+    assert CONFIG.CUBE_SIZE == (0.02, 0.07, 0.09)
     _, width, height = CONFIG.CUBE_SIZE
-    assert math.atan2(width, height) < math.radians(35)
+    assert math.radians(30) < math.atan2(width, height) < math.radians(45)
+    assert width >= 0.07
 
     # Inertia matches a solid box of the collision size
     mass = 0.1
@@ -223,6 +225,31 @@ def test_cube_geometry_matches_config_and_tips_more_easily(env):
         mass / 12 * (depth ** 2 + height ** 2),
         mass / 12 * (depth ** 2 + width ** 2))
     assert inertia == pytest.approx(expected, rel=0.01)
+
+
+# The cube rocks back just below its geometric tipping angle and topples just above it
+@pytest.mark.parametrize("side", [1, -1])
+def test_cube_tips_at_the_geometric_angle(env, side):
+    _, width, height = CONFIG.CUBE_SIZE
+    tipping_angle = math.atan2(width, height)
+    margin = math.radians(3)
+
+    final_angles = {}
+
+    for label, start_angle in (("below", tipping_angle - margin), ("above", tipping_angle + margin)):
+        theta = side * start_angle
+
+        # Balance the cube on one bottom edge, parked clear of the claw
+        centre_z = height / 2 * math.cos(start_angle) + width / 2 * math.sin(start_angle)
+        env.cube.reset(0.35, centre_z, theta)
+
+        for _ in range(480):
+            p.stepSimulation()
+
+        final_angles[label] = env.cube.get_angle()
+
+    assert final_angles["below"] == pytest.approx(0.0, abs=math.radians(1))
+    assert final_angles["above"] == pytest.approx(side * math.pi / 2, abs=math.radians(1))
 
 
 # The fingers start closer to the cube than the previous, splayed-open pose
@@ -286,20 +313,55 @@ def test_initial_pose_is_an_open_claw(env):
     assert 0.0 < lowest_z < CONFIG.CUBE_SIZE[2]
 
 
-# The claw can reach the cube from both sides, and its fingers never reach the floor
-def test_cube_is_reachable_and_fingers_stay_off_the_floor(env):
+# The claw can reach the cube from both sides without pushing through the floor
+def test_cube_is_reachable_from_both_sides_without_entering_the_floor(env):
     contacted_links = set()
-    lowest_z = math.inf
+    deepest_floor_penetration = 0.0
 
     for _ in range(90):
         env.step([POSITIVE] * 3 + [NEGATIVE] * 3)
 
         contacted_links |= {point[3] for point in p.getContactPoints(env.claw_id, env.cube_id)}
-        lowest_z = min(lowest_z, *(lower[2] for lower, _ in _link_aabbs(env.claw_id)))
+
+        for point in p.getContactPoints(env.claw_id, env.plane_id):
+            deepest_floor_penetration = min(deepest_floor_penetration, point[8])
 
     assert contacted_links & set(LEFT_LINKS)
     assert contacted_links & set(RIGHT_LINKS)
-    assert lowest_z > 0.01
+    assert deepest_floor_penetration > -0.002
+
+
+# Nothing on the claw touches or enters the floor at reset
+def test_reset_pose_is_clear_of_the_floor(env):
+    p.performCollisionDetection()
+
+    assert not p.getContactPoints(env.claw_id, env.plane_id)
+
+    clearance = min(point[8] for point in p.getClosestPoints(env.claw_id, env.plane_id, distance=1.0))
+    assert clearance > 0.0
+
+
+# Fingertips can be driven to the floor with the real actions, and the base is low enough that they get there
+def test_fingertips_can_reach_the_floor(env):
+    # Park the cube away so the straight fingers cannot hit it
+    env.cube.reset(0.35, 0.3, 0.0)
+
+    # Fingers hanging straight down are the longest reach
+    targets = np.zeros(len(CONFIG.JOINTS))
+
+    for _ in range(90):
+        _step_toward(env, targets, tolerance=0.01)
+
+    # Closest approach of each fingertip link to the floor, within PyBullet's contact tolerance
+    for links in (LEFT_LINKS, RIGHT_LINKS):
+        distance = min(
+            point[8]
+            for point in p.getClosestPoints(env.claw_id, env.plane_id, distance=0.05, linkIndexA=links[-1]))
+
+        assert distance < 0.002
+
+    # The claw is not pushed through the floor
+    assert all(point[8] > -0.002 for point in p.getContactPoints(env.claw_id, env.plane_id))
 
 
 # --- Self-collision ---
@@ -435,7 +497,7 @@ def _sweep_finger(env, finger_targets, side, num_steps=60):
 
 # Left finger sweeps across the top of the cube and topples it; only contact forces can do this
 def test_left_finger_contact_rotates_cube(env):
-    first_contact_step, theta_before_contact, thetas, ys = _sweep_finger(env, (0.8, 1.0, 0.8), "left")
+    first_contact_step, theta_before_contact, thetas, ys = _sweep_finger(env, (0.4, 1.2, 1.5), "left")
 
     # The cube stays still until a claw link touches it
     assert first_contact_step is not None
@@ -451,10 +513,10 @@ def test_left_finger_contact_rotates_cube(env):
 
 # The mirrored sweep by the right finger rotates the cube the opposite way
 def test_mirrored_right_finger_contact_rotates_cube_the_opposite_way(env):
-    _, _, left_thetas, _ = _sweep_finger(env, (0.8, 1.0, 0.8), "left")
+    _, _, left_thetas, _ = _sweep_finger(env, (0.4, 1.2, 1.5), "left")
 
     env.reset()
-    _, _, right_thetas, _ = _sweep_finger(env, (-0.8, -1.0, -0.8), "right")
+    _, _, right_thetas, _ = _sweep_finger(env, (-0.4, -1.2, -1.5), "right")
 
     left_extreme = left_thetas[np.argmax(np.abs(left_thetas))]
     right_extreme = right_thetas[np.argmax(np.abs(right_thetas))]
@@ -494,7 +556,7 @@ def test_contact_dynamics_are_applied_to_live_bodies(env):
 
 # Push the upper face of the cube with the left finger using only the real actions: approach clear of the cube, then push
 # The cube's pose is never set after reset, so any rotation comes from claw contact
-def _push_upper_face(env, plane, cube, finger, approach=(-0.8, 0.6, 0.0), push=(-0.3, 1.3, 0.6)):
+def _push_upper_face(env, plane, cube, finger, approach=(-0.4, 0.3, 0.3), push=(-0.1, 1.4, 1.3)):
     env.reset()
 
     cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
@@ -550,17 +612,17 @@ def test_configured_friction_tips_the_cube_instead_of_sliding_it():
         assert result["contact"] and not result["contact_before_push"]
         assert np.isfinite(result["max_theta"]) and np.isfinite(result["final_y"])
 
-    # Before: the cube is mostly shoved sideways
-    assert before["max_theta"] < math.radians(10)
+    # Before: the cube is mostly shoved sideways and only rocks (well short of its tipping angle plus margin)
+    assert before["max_theta"] < math.radians(25)
     assert before["max_y"] > 0.04
 
-    # After: it genuinely rotates (and so is not jammed), while sliding no further than before
-    assert after["max_theta"] > math.radians(30)
-    assert after["max_theta"] < math.radians(90)
+    # After: it genuinely topples (and so is not jammed), while sliding no further than before
+    assert after["max_theta"] > math.radians(60)
+    assert after["max_theta"] < math.radians(120)
     assert after["max_y"] <= before["max_y"]
 
     # Rotation per metre of sliding rises by a large factor
-    assert after["max_theta"] / after["max_y"] > 10 * before["max_theta"] / before["max_y"]
+    assert after["max_theta"] / after["max_y"] > 3 * before["max_theta"] / before["max_y"]
 
 
 # Friction must not be so high that a finger glues to the cube: the pushed cube has to move

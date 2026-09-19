@@ -103,16 +103,17 @@ try:
         # Update number of sampled episodes
         episodes_completed += batch_size
 
-        # Print training diagnostics
-        print(
-            f"Update {update:4d} | "
-            f"episodes {episode_start:4d}-{episode_end:<4d} | "
-            f"mean return {diagnostics['mean_discounted_return']:8.2f} | "
-            f"min {diagnostics['min_discounted_return']:8.2f} | "
-            f"max {diagnostics['max_discounted_return']:8.2f} | "
-            f"loss {diagnostics['mean_loss']:10.2f} | "
-            f"grad {diagnostics['gradient_norm']:8.2f}"
-        )
+        # Print training diagnostics every PRINT_INTERVAL_UPDATES updates
+        if update % CONFIG.PRINT_INTERVAL_UPDATES == 0:
+            print(
+                f"Update {update:4d} | "
+                f"episodes {episode_start:4d}-{episode_end:<4d} | "
+                f"mean return {diagnostics['mean_discounted_return']:8.2f} | "
+                f"min {diagnostics['min_discounted_return']:8.2f} | "
+                f"max {diagnostics['max_discounted_return']:8.2f} | "
+                f"loss {diagnostics['mean_loss']:10.2f} | "
+                f"grad {diagnostics['gradient_norm']:8.2f}"
+            )
 
         # Save checkpoint on the first update that reaches each interval boundary
         # Batches are not aligned to the interval, so testing divisibility would only save at the least common multiple

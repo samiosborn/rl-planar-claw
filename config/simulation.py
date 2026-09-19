@@ -44,7 +44,7 @@ RESTITUTION = 0.0
 # --- Claw ---
 
 # Fixed base position (world frame, metres)
-CLAW_BASE_POSITION = (0.0, 0.0, 0.30)
+CLAW_BASE_POSITION = (0.0, 0.0, 0.27)
 
 LEFT_JOINTS = (
     "left_joint_1",
@@ -86,7 +86,7 @@ CUBE_JOINT_ANGLE = "cube_joint_x"
 CUBE_JOINTS = (CUBE_JOINT_Y, CUBE_JOINT_Z, CUBE_JOINT_ANGLE)
 
 # Cube box size
-CUBE_SIZE = (0.02, 0.06, 0.10)
+CUBE_SIZE = (0.02, 0.07, 0.09)
 
 # Initial cube pose, resting on the floor
 CUBE_INITIAL_Y = 0.0
@@ -135,6 +135,9 @@ REINFORCE_NUM_WORKERS = 8
 
 # Save a checkpoint every N training episodes
 CHECKPOINT_INTERVAL_EPISODES = 1000
+
+# Print training progress every N updates
+PRINT_INTERVAL_UPDATES = 100
 
 
 # --- Evaluation / visualisation ---
