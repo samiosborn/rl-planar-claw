@@ -8,6 +8,7 @@ import torch
 import config.simulation as CONFIG
 from src.algorithms.reinforce import PolicyNetwork, sample_action
 from src.env import PlanarClawEnv
+from src.scene import apply_camera
 
 
 # Parse arguments
@@ -38,6 +39,9 @@ policy.eval()
 
 # Initialise GUI environment
 env = PlanarClawEnv(gui=True)
+
+# Side-on camera
+apply_camera()
 
 try:
     # Run episodes

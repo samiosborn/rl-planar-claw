@@ -28,6 +28,15 @@ def load_scene() -> tuple[int, int, int]:
     return plane_id, claw_id, cube_id
 
 
+# Point the GUI camera side-on at the claw workspace (no effect in DIRECT mode)
+def apply_camera() -> None:
+    p.resetDebugVisualizerCamera(
+        cameraDistance=CONFIG.CAMERA_DISTANCE,
+        cameraYaw=CONFIG.CAMERA_YAW,
+        cameraPitch=CONFIG.CAMERA_PITCH,
+        cameraTargetPosition=CONFIG.CAMERA_TARGET_POSITION)
+
+
 # Map joint names to PyBullet joint indices
 def get_joint_indices(body_id: int) -> dict[str, int]:
     return {

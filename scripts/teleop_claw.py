@@ -7,6 +7,7 @@ import pybullet as p
 
 import config.simulation as CONFIG
 from src.env import PlanarClawEnv
+from src.scene import apply_camera
 
 
 # Seconds between console readouts of the cube angle
@@ -27,11 +28,7 @@ def drive_claw_to_positions(env: PlanarClawEnv, targets: dict[str, float]) -> No
 def main() -> None:
     env = PlanarClawEnv(gui=True)
 
-    p.resetDebugVisualizerCamera(
-        cameraDistance=CONFIG.CAMERA_DISTANCE,
-        cameraYaw=CONFIG.CAMERA_YAW,
-        cameraPitch=CONFIG.CAMERA_PITCH,
-        cameraTargetPosition=CONFIG.CAMERA_TARGET_POSITION)
+    apply_camera()
 
     # One slider per joint, spanning its URDF limits
     sliders = {}

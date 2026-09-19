@@ -114,9 +114,11 @@ try:
             f"grad {diagnostics['gradient_norm']:8.2f}"
         )
 
-        # Save checkpoint at configured episode intervals
+        # Save checkpoint on the first update that reaches each interval boundary
+        # Batches are not aligned to the interval, so testing divisibility would only save at the least common multiple
         if (
-            episodes_completed % CONFIG.CHECKPOINT_INTERVAL_EPISODES == 0
+            episodes_completed // CONFIG.CHECKPOINT_INTERVAL_EPISODES
+            > episode_start // CONFIG.CHECKPOINT_INTERVAL_EPISODES
             or episodes_completed == CONFIG.NUM_TRAINING_EPISODES
         ):
             save_checkpoint(

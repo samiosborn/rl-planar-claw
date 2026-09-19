@@ -418,6 +418,22 @@ def test_teleop_camera_looks_along_x_with_z_up():
     assert np.allclose(screen_up, (0, 0, 1), atol=1e-6)
 
 
+# Every GUI script shares one helper, which forwards exactly the configured camera
+def test_apply_camera_uses_configured_camera(monkeypatch):
+    from src.scene import apply_camera
+
+    calls = []
+    monkeypatch.setattr(p, "resetDebugVisualizerCamera", lambda **kwargs: calls.append(kwargs))
+
+    apply_camera()
+
+    assert calls == [dict(
+        cameraDistance=CONFIG.CAMERA_DISTANCE,
+        cameraYaw=CONFIG.CAMERA_YAW,
+        cameraPitch=CONFIG.CAMERA_PITCH,
+        cameraTargetPosition=CONFIG.CAMERA_TARGET_POSITION)]
+
+
 # The teleop drives the same claw the environment (and so training) uses
 def test_teleop_drives_all_six_joints_of_the_environments_claw(env):
     from scripts import teleop_claw

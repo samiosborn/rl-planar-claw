@@ -4,10 +4,14 @@ import random
 
 import config.simulation as CONFIG
 from src.env import PlanarClawEnv
+from src.scene import apply_camera
 
 
 # Create environment
 env = PlanarClawEnv(gui=True)
+
+# Side-on camera
+apply_camera()
 
 try:
     # Reset state
