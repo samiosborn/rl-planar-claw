@@ -133,8 +133,8 @@ REINFORCE_BATCH_SIZE = 20
 # Worker processes used to sample trajectories in parallel
 REINFORCE_NUM_WORKERS = 8
 
-# Save a checkpoint every N training episodes
-CHECKPOINT_INTERVAL_EPISODES = 1000
+# Save a checkpoint every N optimiser updates
+CHECKPOINT_INTERVAL_UPDATES = 100
 
 # Print training progress every N updates
 PRINT_INTERVAL_UPDATES = 100

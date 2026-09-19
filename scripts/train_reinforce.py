@@ -1,12 +1,16 @@
 # scripts/train_reinforce.py
 
 from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime
 
 import torch
 
 import config.simulation as CONFIG
 from src.algorithms.reinforce import PolicyNetwork, train_batch
+from src.checkpoint import (
+    save_checkpoint,
+    should_print_progress,
+    should_save_checkpoint,
+)
 from src.parallel_rollout import init_worker
 
 
@@ -26,31 +30,6 @@ CONFIG.REINFORCE_CHECKPOINT_DIR.mkdir(
 )
 
 
-# Save policy checkpoint
-def save_checkpoint(policy, optimiser, episodes_completed):
-    # Current date and time
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-
-    # Checkpoint path
-    checkpoint_path = (
-        CONFIG.REINFORCE_CHECKPOINT_DIR
-        / f"{timestamp}_episode_{episodes_completed}.pt"
-    )
-
-    # Save training state
-    torch.save(
-        {
-            "episode": episodes_completed,
-            "timestamp": timestamp,
-            "policy_state_dict": policy.state_dict(),
-            "optimiser_state_dict": optimiser.state_dict(),
-        },
-        checkpoint_path,
-    )
-
-    print(f"Saved checkpoint: {checkpoint_path}")
-
-
 # Persistent worker pool for the whole training run
 # Each worker creates its own PyBullet environment and policy exactly once (see src/parallel_rollout.py)
 # No PyBullet connection is created in this process
@@ -61,18 +40,21 @@ pool = ProcessPoolExecutor(
 
 try:
     # Initialise training progress
+    # completed_updates counts optimiser updates already performed
     episodes_completed = 0
-    update = 0
-
-    # Save initial untrained policy
-    save_checkpoint(
-        policy,
-        optimiser,
-        episodes_completed,
-    )
+    completed_updates = 0
 
     # Train policy
     while episodes_completed < CONFIG.NUM_TRAINING_EPISODES:
+        # Save policy after exactly completed_updates optimiser updates (0 is the untrained policy)
+        if should_save_checkpoint(completed_updates):
+            save_checkpoint(
+                policy,
+                optimiser,
+                completed_updates,
+                episodes_completed,
+            )
+
         # Number of episodes remaining
         episodes_remaining = (
             CONFIG.NUM_TRAINING_EPISODES
@@ -100,13 +82,11 @@ try:
             episodes_completed,
         )
 
-        # Update number of sampled episodes
-        episodes_completed += batch_size
-
         # Print training diagnostics every PRINT_INTERVAL_UPDATES updates
-        if update % CONFIG.PRINT_INTERVAL_UPDATES == 0:
+        # The batch was sampled from the policy after completed_updates updates, before the next one
+        if should_print_progress(completed_updates):
             print(
-                f"Update {update:4d} | "
+                f"Update {completed_updates:4d} | "
                 f"episodes {episode_start:4d}-{episode_end:<4d} | "
                 f"mean return {diagnostics['mean_discounted_return']:8.2f} | "
                 f"min {diagnostics['min_discounted_return']:8.2f} | "
@@ -115,21 +95,17 @@ try:
                 f"grad {diagnostics['gradient_norm']:8.2f}"
             )
 
-        # Save checkpoint on the first update that reaches each interval boundary
-        # Batches are not aligned to the interval, so testing divisibility would only save at the least common multiple
-        if (
-            episodes_completed // CONFIG.CHECKPOINT_INTERVAL_EPISODES
-            > episode_start // CONFIG.CHECKPOINT_INTERVAL_EPISODES
-            or episodes_completed == CONFIG.NUM_TRAINING_EPISODES
-        ):
-            save_checkpoint(
-                policy,
-                optimiser,
-                episodes_completed,
-            )
+        # Update counters after the optimiser step
+        episodes_completed += batch_size
+        completed_updates += 1
 
-        # Increment optimiser update count
-        update += 1
+    # Save final policy after the last optimiser update
+    save_checkpoint(
+        policy,
+        optimiser,
+        completed_updates,
+        episodes_completed,
+    )
 
 finally:
     pool.shutdown(wait=True)
