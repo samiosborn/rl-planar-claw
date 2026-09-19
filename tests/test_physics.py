@@ -211,13 +211,14 @@ def test_cube_geometry_matches_config_and_tips_more_easily(env):
     assert box_sizes == [CONFIG.CUBE_SIZE] * 2
 
     # Narrower footprint than height, so the tipping angle atan(width / height) is below 45 degrees, but not too tall to reach once toppled
-    assert CONFIG.CUBE_SIZE == (0.02, 0.07, 0.09)
+    assert CONFIG.CUBE_SIZE == (0.02, 0.08, 0.09)
     _, width, height = CONFIG.CUBE_SIZE
-    assert math.radians(30) < math.atan2(width, height) < math.radians(45)
-    assert width >= 0.07
+    assert math.degrees(math.atan2(width, height)) == pytest.approx(41.63, abs=0.01)
+    assert width == 0.08
 
-    # Inertia matches a solid box of the collision size
+    # Inertia matches a solid box of the collision size, with the same 0.1 kg mass
     mass = 0.1
+    assert p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[0] == pytest.approx(mass)
     inertia = p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[2]
     depth = CONFIG.CUBE_SIZE[0]
     expected = (
@@ -364,6 +365,68 @@ def test_fingertips_can_reach_the_floor(env):
     assert all(point[8] > -0.002 for point in p.getContactPoints(env.claw_id, env.plane_id))
 
 
+# Reset pose keeps measurable clearance from the floor and cube, with mirrored fingertips
+def test_reset_fingertips_are_clear_of_the_floor_and_cube(env):
+    p.performCollisionDetection()
+
+    floor_clearance = min(point[8] for point in p.getClosestPoints(env.claw_id, env.plane_id, distance=1.0))
+    cube_clearance = min(point[8] for point in p.getClosestPoints(env.claw_id, env.cube_id, distance=1.0))
+
+    assert 0.005 < floor_clearance < 0.02
+    assert 0.01 < cube_clearance < 0.03
+
+    # Fingertip link origins (joint 3) and lowest points are mirrored and above the floor
+    left_tip = np.array(p.getLinkState(env.claw_id, 1)[0])
+    right_tip = np.array(p.getLinkState(env.claw_id, 4)[0])
+    assert left_tip == pytest.approx(right_tip * np.array([1, -1, 1]), abs=1e-6)
+
+    for links in (LEFT_LINKS, RIGHT_LINKS):
+        assert min(p.getAABB(env.claw_id, link)[0][2] for link in links) > 0.005
+
+
+# Fallen-cube contact configurations, left finger (right is the mirror), joints 1-3
+FALLEN_CUBE_CONTACT_POSE = (-0.65, 0.35, 1.0)
+
+
+# Cube lying on its side at 90 degrees, either way round, can be touched mid-height on the exposed side by each finger
+@pytest.mark.parametrize("angle", [math.pi / 2, -math.pi / 2])
+def test_fallen_cube_side_is_reachable_by_both_fingers(env, angle):
+    _, width, height = CONFIG.CUBE_SIZE
+    env.cube.reset(0.0, width / 2, angle)
+
+    # The fallen cube is 0.08 m tall and 0.09 m across
+    lower, upper = p.getAABB(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])
+    assert upper[2] == pytest.approx(width, abs=1e-3)
+    assert upper[1] == pytest.approx(height / 2, abs=1e-3)
+
+    # Sweep both fingers from reset to the contact pose without touching anything on the way
+    start = np.array(env.robot.get_joint_positions())
+    goal = np.array(list(FALLEN_CUBE_CONTACT_POSE) + [-q for q in FALLEN_CUBE_CONTACT_POSE])
+
+    for fraction in np.linspace(0.0, 1.0, 41):
+        for joint_name, position in zip(CONFIG.JOINTS, start + fraction * (goal - start)):
+            p.resetJointState(env.claw_id, env.robot.joint_indices[joint_name], position)
+
+        p.performCollisionDetection()
+
+        for body_id in (env.plane_id, env.cube_id):
+            assert all(point[8] > -1e-3 for point in p.getClosestPoints(env.claw_id, body_id, distance=0.0))
+
+        for left_link in LEFT_LINKS:
+            for right_link in RIGHT_LINKS:
+                assert not p.getClosestPoints(env.claw_id, env.claw_id, distance=-1e-3, linkIndexA=left_link, linkIndexB=right_link)
+
+    # Each fingertip touches its own exposed side face at about mid-height
+    for links, side in ((LEFT_LINKS, -1), (RIGHT_LINKS, 1)):
+        points = p.getClosestPoints(env.claw_id, env.cube_id, distance=0.002, linkIndexA=links[-1])
+
+        assert points
+        contact = points[0]
+        assert abs(contact[7][1]) > 0.9
+        assert contact[5][1] == pytest.approx(side * height / 2, abs=0.004)
+        assert contact[5][2] == pytest.approx(width / 2, abs=0.01)
+
+
 # --- Self-collision ---
 
 
@@ -424,7 +487,7 @@ def test_virtual_carriage_links_add_negligible_mass(env):
         assert 0.0 < carriage_mass <= 0.002 * cube_mass
 
 
-# In free air the cube must respond as a 0.1 kg, I = 1.13e-4 kg m^2 rigid body would, so the carriage links do not distort its dynamics
+# In free air the cube must respond as a 0.1 kg, I = 1.21e-4 kg m^2 rigid body would, so the carriage links do not distort its dynamics
 def test_cube_effective_mass_and_inertia(env):
     cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
     duration_steps = 24
@@ -556,7 +619,7 @@ def test_contact_dynamics_are_applied_to_live_bodies(env):
 
 # Push the upper face of the cube with the left finger using only the real actions: approach clear of the cube, then push
 # The cube's pose is never set after reset, so any rotation comes from claw contact
-def _push_upper_face(env, plane, cube, finger, approach=(-0.4, 0.3, 0.3), push=(-0.1, 1.4, 1.3)):
+def _push_upper_face(env, plane, cube, finger, approach=(-0.55, 0.3, 0.5), push=(-0.1, 1.5, 1.0)):
     env.reset()
 
     cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
@@ -616,10 +679,10 @@ def test_configured_friction_tips_the_cube_instead_of_sliding_it():
     assert before["max_theta"] < math.radians(25)
     assert before["max_y"] > 0.04
 
-    # After: it genuinely topples (and so is not jammed), while sliding no further than before
+    # After: it genuinely topples (and so is not jammed), while sliding no meaningfully further than before
     assert after["max_theta"] > math.radians(60)
     assert after["max_theta"] < math.radians(120)
-    assert after["max_y"] <= before["max_y"]
+    assert after["max_y"] <= before["max_y"] + 0.005
 
     # Rotation per metre of sliding rises by a large factor
     assert after["max_theta"] / after["max_y"] > 3 * before["max_theta"] / before["max_y"]

@@ -44,7 +44,7 @@ RESTITUTION = 0.0
 # --- Claw ---
 
 # Fixed base position (world frame, metres)
-CLAW_BASE_POSITION = (0.0, 0.0, 0.27)
+CLAW_BASE_POSITION = (0.0, 0.0, 0.26)
 
 LEFT_JOINTS = (
     "left_joint_1",
@@ -62,12 +62,12 @@ JOINTS = LEFT_JOINTS + RIGHT_JOINTS
 
 # Fingers hang down beside the cube with the outer joints curled in, so the fingertips start just clear of its sides
 INITIAL_JOINT_POSITIONS = {
-    "left_joint_1": -0.4,
+    "left_joint_1": -0.55,
     "left_joint_2": 0.3,
-    "left_joint_3": 0.3,
-    "right_joint_1": 0.4,
+    "left_joint_3": 0.5,
+    "right_joint_1": 0.55,
     "right_joint_2": -0.3,
-    "right_joint_3": -0.3,
+    "right_joint_3": -0.5,
 }
 
 # Max joint velocity (rad/s)
@@ -86,7 +86,7 @@ CUBE_JOINT_ANGLE = "cube_joint_x"
 CUBE_JOINTS = (CUBE_JOINT_Y, CUBE_JOINT_Z, CUBE_JOINT_ANGLE)
 
 # Cube box size
-CUBE_SIZE = (0.02, 0.07, 0.09)
+CUBE_SIZE = (0.02, 0.08, 0.09)
 
 # Initial cube pose, resting on the floor
 CUBE_INITIAL_Y = 0.0
