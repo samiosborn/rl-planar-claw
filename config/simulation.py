@@ -60,14 +60,14 @@ RIGHT_JOINTS = (
 
 JOINTS = LEFT_JOINTS + RIGHT_JOINTS
 
-# Fingers hang down from the base and start slightly splayed, so the claw begins open and collision-free
+# Fingers hang down beside the cube with the outer joints curled in, so the fingertips start just clear of its sides
 INITIAL_JOINT_POSITIONS = {
-    "left_joint_1": -0.3,
-    "left_joint_2": 0.0,
-    "left_joint_3": 0.0,
-    "right_joint_1": 0.3,
-    "right_joint_2": 0.0,
-    "right_joint_3": 0.0,
+    "left_joint_1": -0.4,
+    "left_joint_2": 0.3,
+    "left_joint_3": 0.3,
+    "right_joint_1": 0.4,
+    "right_joint_2": -0.3,
+    "right_joint_3": -0.3,
 }
 
 # Max joint velocity (rad/s)
@@ -85,9 +85,12 @@ CUBE_JOINT_Z = "cube_slider_z"
 CUBE_JOINT_ANGLE = "cube_joint_x"
 CUBE_JOINTS = (CUBE_JOINT_Y, CUBE_JOINT_Z, CUBE_JOINT_ANGLE)
 
-# Initial cube pose
+# Cube box size
+CUBE_SIZE = (0.02, 0.06, 0.10)
+
+# Initial cube pose, resting on the floor
 CUBE_INITIAL_Y = 0.0
-CUBE_INITIAL_Z = 0.04
+CUBE_INITIAL_Z = CUBE_SIZE[2] / 2
 CUBE_INITIAL_ANGLE = 0.0
 
 
@@ -96,8 +99,10 @@ CUBE_INITIAL_ANGLE = 0.0
 # Target cube angle about world x (radians)
 TARGET_CUBE_ANGLE = math.pi / 4
 
-SUCCESS_TOLERANCE = math.radians(5)
+# Quadratic reward weight
+REWARD_QUADRATIC_WEIGHT = 0.5
 
+# Max steps in an episode
 MAX_EPISODE_STEPS = 300
 
 # 6 joint positions, 6 joint velocities, cube y, z, sin/cos(angle), vy, vz, angular velocity

@@ -48,7 +48,6 @@ try:
     print(
         f"Episode ended | "
         f"steps={env.step_count} | "
-        f"success_steps={env.success_steps} | "
         f"done={done}"
     )
 

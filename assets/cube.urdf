@@ -1,8 +1,7 @@
 <!-- assets/cube.urdf -->
-<!-- Passive planar mechanism, not a free body: fixed mount -> prismatic y -> prismatic z -> continuous revolute x -> cube_link
+    <!-- Passive planar mechanism, not a free body: fixed mount -> prismatic y -> prismatic z -> continuous revolute x -> cube_link
     x translation and rotation about y/z are structurally impossible, and gravity and contact drive the remaining three DoF
     All three joint motors must be disabled after loading (see src/cube.py)
-
     The two carriage links exist only to carry the prismatic joints
     They have a token 1e-4 kg (0.1% of the cube) so the solver never sees a massless link without visibly slowing the cube
     They never rotate, so their inertia is irrelevant -->
@@ -84,26 +83,26 @@
     <link name="cube_link">
         <visual>
             <geometry>
-                <box size="0.02 0.08 0.08"/>
+                <box size="0.02 0.06 0.10"/>
             </geometry>
             <material name="cube_colour"/>
         </visual>
 
         <collision>
             <geometry>
-                <box size="0.02 0.08 0.08"/>
+                <box size="0.02 0.06 0.10"/>
             </geometry>
         </collision>
 
         <inertial>
             <mass value="0.10"/>
             <inertia
-                ixx="0.000107"
+                ixx="0.000113"
                 ixy="0"
                 ixz="0"
-                iyy="0.000057"
+                iyy="0.0000867"
                 iyz="0"
-                izz="0.000057"/>
+                izz="0.0000333"/>
         </inertial>
     </link>
 

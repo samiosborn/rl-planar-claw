@@ -11,6 +11,7 @@ from src.scene import load_scene, setup_physics
 
 
 class PlanarClawEnv:
+    # Set up environment
     def __init__(self, gui: bool = True):
         connection_mode = p.GUI if gui else p.DIRECT
         self.physics_client_id = p.connect(connection_mode)
@@ -25,6 +26,7 @@ class PlanarClawEnv:
 
     # --- Helpers ---
 
+    # Validate actions
     def _validate_actions(self, actions) -> None:
         if len(actions) != len(CONFIG.JOINTS):
             raise ValueError(f"Expected {len(CONFIG.JOINTS)} actions, got {len(actions)}")
@@ -37,11 +39,12 @@ class PlanarClawEnv:
             if not 0 <= action < len(CONFIG.JOINT_ACTION_VELOCITIES):
                 raise ValueError(f"Action {action} must be between 0 and {len(CONFIG.JOINT_ACTION_VELOCITIES) - 1}")
 
-    def _compute_reward(self, angle_error: float) -> float:
-        return -abs(angle_error)
 
-    def _is_success(self, angle_error: float) -> bool:
-        return abs(angle_error) <= CONFIG.SUCCESS_TOLERANCE
+    # Compute reward
+    def _compute_reward(self, angle_error: float) -> float:
+        normalised_error = abs(angle_error) / CONFIG.TARGET_CUBE_ANGLE
+
+        return -(normalised_error + CONFIG.REWARD_QUADRATIC_WEIGHT * normalised_error ** 2)
 
 
     # --- API ---
@@ -54,16 +57,17 @@ class PlanarClawEnv:
         return math.atan2(math.sin(difference), math.cos(difference))
 
 
+    # Reset env
     def reset(self) -> np.ndarray:
         self.robot.reset(CONFIG.INITIAL_JOINT_POSITIONS)
         self.cube.reset(CONFIG.CUBE_INITIAL_Y, CONFIG.CUBE_INITIAL_Z, CONFIG.CUBE_INITIAL_ANGLE)
 
         self.step_count = 0
-        self.success_steps = 0
 
         return self.get_observation()
 
 
+    # Get observation (state)
     def get_observation(self) -> np.ndarray:
         joint_positions = self.robot.get_joint_positions()
         joint_velocities = self.robot.get_joint_velocities()
@@ -87,6 +91,7 @@ class PlanarClawEnv:
         return observation
 
 
+    # One step in env
     def step(self, actions) -> tuple[np.ndarray, float, bool]:
         self._validate_actions(actions)
 
@@ -103,14 +108,12 @@ class PlanarClawEnv:
         angle_error = self.get_angle_error()
         reward = self._compute_reward(angle_error)
 
-        if self._is_success(angle_error):
-            self.success_steps += 1
-
         done = self.step_count >= CONFIG.MAX_EPISODE_STEPS
 
         return next_state, reward, done
 
 
+    # Close env
     def close(self) -> None:
         if p.isConnected(self.physics_client_id):
             p.disconnect(self.physics_client_id)

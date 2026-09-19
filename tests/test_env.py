@@ -157,36 +157,87 @@ def test_large_angle_error(angle_error, monkeypatch):
             _, reward, done = env.step(actions)
 
             # Keep the same reward and episode length
-            assert reward == -abs(angle_error)
+            assert reward == pytest.approx(_expected_reward(angle_error))
             assert done == (step == CONFIG.MAX_EPISODE_STEPS)
-
-        assert env.success_steps == 0
 
     finally:
         # Close environment
         env.close()
 
 
-# Test success tracking does not end an episode early
-def test_success_tracking(monkeypatch):
-    # Create environment
+# Reward as a function of the angular error only
+def _reward_for_error(angle_error, monkeypatch):
     env = PlanarClawEnv(gui=False)
 
     try:
-        # Hold angle error within success tolerance
-        monkeypatch.setattr(env, "get_angle_error", lambda: CONFIG.SUCCESS_TOLERANCE)
-        actions = [1] * len(CONFIG.JOINTS)
+        monkeypatch.setattr(env, "get_angle_error", lambda: angle_error)
 
-        # Run a complete episode
-        for step in range(1, CONFIG.MAX_EPISODE_STEPS + 1):
-            _, _, done = env.step(actions)
-
-            # Track success without ending early
-            assert env.success_steps == step
-            assert done == (step == CONFIG.MAX_EPISODE_STEPS)
+        return env.step([1] * len(CONFIG.JOINTS))[1]
 
     finally:
-        # Close environment
+        env.close()
+
+
+# Reference reward: -(x + 0.5 x^2) with x = |error| / target
+def _expected_reward(angle_error):
+    x = abs(angle_error) / CONFIG.TARGET_CUBE_ANGLE
+
+    return -(x + 0.5 * x ** 2)
+
+
+# Test the reward is zero at the target and hits the documented values
+@pytest.mark.parametrize("degrees, expected", [(0, 0.0), (45, -1.5), (90, -4.0)])
+def test_reward_reference_values(degrees, expected, monkeypatch):
+    assert _reward_for_error(math.radians(degrees), monkeypatch) == pytest.approx(expected)
+
+
+# Test a small error is only slightly negative
+def test_reward_small_error_is_negative_but_close_to_zero(monkeypatch):
+    reward = _reward_for_error(math.radians(5), monkeypatch)
+
+    assert reward == pytest.approx(_expected_reward(math.radians(5)))
+    assert -0.2 < reward < 0.0
+
+
+# Test equal positive and negative errors give the same reward
+@pytest.mark.parametrize("degrees", [5, 15, 45, 90, 170])
+def test_reward_is_symmetric_in_error_sign(degrees, monkeypatch):
+    positive = _reward_for_error(math.radians(degrees), monkeypatch)
+    negative = _reward_for_error(-math.radians(degrees), monkeypatch)
+
+    assert positive == negative
+
+
+# Test a larger absolute error is always more negative, and the penalty grows faster than linearly
+def test_reward_decreases_with_absolute_error(monkeypatch):
+    degrees = [0, 5, 15, 45, 90, 135, 180]
+    rewards = [_reward_for_error(math.radians(d), monkeypatch) for d in degrees]
+
+    assert all(later < earlier for earlier, later in zip(rewards, rewards[1:]))
+
+    # Reward per radian of error keeps getting worse
+    slopes = [reward / math.radians(d) for reward, d in zip(rewards[1:], degrees[1:])]
+    assert all(later < earlier for earlier, later in zip(slopes, slopes[1:]))
+
+
+# Test the reward wraps around +-pi: an angle a full turn away, or just across the branch cut, gives the wrapped error's reward
+@pytest.mark.parametrize("theta, expected_abs_error", [
+    (-math.pi + 0.1, 3 * math.pi / 4 + 0.1),
+    (math.pi - 0.1, 3 * math.pi / 4 - 0.1),
+    (CONFIG.TARGET_CUBE_ANGLE + 2 * math.pi, 0.0),
+])
+def test_reward_uses_wrapped_angle_error(theta, expected_abs_error, monkeypatch):
+    env = PlanarClawEnv(gui=False)
+
+    try:
+        monkeypatch.setattr(env.cube, "get_angle", lambda: theta)
+
+        angle_error = env.get_angle_error()
+
+        assert abs(angle_error) == pytest.approx(expected_abs_error, abs=1e-9)
+        assert env._compute_reward(angle_error) == pytest.approx(_expected_reward(expected_abs_error))
+
+    finally:
         env.close()
 
 
@@ -208,7 +259,6 @@ def test_reset_statistics():
 
         # Check statistics
         assert env.step_count == 0
-        assert env.success_steps == 0
 
     finally:
         # Close environment

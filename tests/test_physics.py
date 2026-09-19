@@ -160,10 +160,12 @@ def test_claw_joints_respect_limits_under_random_aggressive_commands(env):
 # --- Initial geometry ---
 
 
+# Bounding boxes of every link
 def _link_aabbs(body_id):
     return [p.getAABB(body_id, link_index) for link_index in range(p.getNumJoints(body_id))]
 
 
+# Initial geometry is centred, symmetric and clear
 def test_initial_geometry_is_centred_symmetric_and_clear(env):
     claw_aabbs = _link_aabbs(env.claw_id)
 
@@ -194,13 +196,83 @@ def test_initial_geometry_is_centred_symmetric_and_clear(env):
         for right_link in RIGHT_LINKS:
             assert not p.getClosestPoints(env.claw_id, env.claw_id, distance=0.005, linkIndexA=left_link, linkIndexB=right_link)
 
-    # Each finger is visibly clear of the cube
+    # Each finger is clear of the cube, but close enough to be contact-ready
     finger_clearance = min(point[8] for point in p.getClosestPoints(env.claw_id, env.cube_id, distance=1.0))
-    assert finger_clearance > 0.02
+    assert 0.01 < finger_clearance < 0.03
 
 
+# Cube geometry matches config and tips easily
+def test_cube_geometry_matches_config_and_tips_more_easily(env):
+    box_sizes = [
+        tuple(float(v) for v in box.get("size").split())
+        for box in ET.parse(CONFIG.CUBE_URDF_PATH).getroot().iter("box")]
+
+    # Visual and collision boxes both use the configured size
+    assert box_sizes == [CONFIG.CUBE_SIZE] * 2
+
+    # Narrower footprint than height, so the tipping angle atan(width / height) is below 45 degrees
+    _, width, height = CONFIG.CUBE_SIZE
+    assert math.atan2(width, height) < math.radians(35)
+
+    # Inertia matches a solid box of the collision size
+    mass = 0.1
+    inertia = p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[2]
+    depth = CONFIG.CUBE_SIZE[0]
+    expected = (
+        mass / 12 * (width ** 2 + height ** 2),
+        mass / 12 * (depth ** 2 + height ** 2),
+        mass / 12 * (depth ** 2 + width ** 2))
+    assert inertia == pytest.approx(expected, rel=0.01)
+
+
+# The fingers start closer to the cube than the previous, splayed-open pose
+def test_initial_pose_is_closer_to_contact_than_before(env):
+    # Smallest finger-to-cube distance
+    def clearance():
+        p.performCollisionDetection()
+
+        return min(point[8] for point in p.getClosestPoints(env.claw_id, env.cube_id, distance=1.0))
+
+    new_clearance = clearance()
+
+    env.robot.reset({
+        "left_joint_1": -0.3, "left_joint_2": 0.0, "left_joint_3": 0.0,
+        "right_joint_1": 0.3, "right_joint_2": 0.0, "right_joint_3": 0.0})
+    old_clearance = clearance()
+
+    assert new_clearance < old_clearance
+
+
+# The initial joint configuration is an exact left/right mirror and within limits
+def test_initial_joint_positions_are_symmetric_and_within_limits(env):
+    for left, right in zip(CONFIG.LEFT_JOINTS, CONFIG.RIGHT_JOINTS):
+        assert CONFIG.INITIAL_JOINT_POSITIONS[left] == -CONFIG.INITIAL_JOINT_POSITIONS[right]
+
+    limits = _claw_limits(env)
+    for name, (lower, upper) in limits.items():
+        assert lower <= CONFIG.INITIAL_JOINT_POSITIONS[name] <= upper
+
+
+# The reset pose is stable: nothing touches, the cube stays put and the claw does not drift
+def test_reset_pose_is_stable_without_penetration(env):
+    initial_positions = np.array(env.robot.get_joint_positions())
+
+    for _ in range(120):
+        env.step([HOLD] * 6)
+
+        assert not p.getContactPoints(env.claw_id, env.cube_id)
+        assert not p.getContactPoints(env.claw_id, env.claw_id)
+
+    y, z, theta, *_ = env.cube.get_state()
+    assert y == pytest.approx(CONFIG.CUBE_INITIAL_Y, abs=1e-4)
+    assert z == pytest.approx(CONFIG.CUBE_INITIAL_Z, abs=1e-3)
+    assert theta == pytest.approx(0.0, abs=1e-4)
+    assert env.robot.get_joint_positions() == pytest.approx(initial_positions, abs=1e-2)
+
+
+# Fingertips start outside the cube and low enough to reach it
 def test_initial_pose_is_an_open_claw(env):
-    cube_half_width = 0.04
+    cube_half_width = CONFIG.CUBE_SIZE[1] / 2
 
     left_tip_y = p.getLinkState(env.claw_id, 2)[0][1]
     right_tip_y = p.getLinkState(env.claw_id, 5)[0][1]
@@ -211,7 +283,7 @@ def test_initial_pose_is_an_open_claw(env):
 
     # Fingertips start just above the floor, level with the cube
     lowest_z = min(lower[2] for lower, _ in _link_aabbs(env.claw_id))
-    assert 0.0 < lowest_z < 2 * cube_half_width
+    assert 0.0 < lowest_z < CONFIG.CUBE_SIZE[2]
 
 
 # The claw can reach the cube from both sides, and its fingers never reach the floor
@@ -261,6 +333,7 @@ def test_fingers_do_not_interpenetrate(env):
 # --- Cube resting behaviour and dynamics ---
 
 
+# Cube rests on the floor and stays put
 def test_cube_rests_on_the_floor_and_stays_put(env):
     for _ in range(480):
         p.stepSimulation()
@@ -268,7 +341,7 @@ def test_cube_rests_on_the_floor_and_stays_put(env):
     y, z, theta, vy, vz, omega = env.cube.get_state()
 
     # Neither hovering nor sinking
-    assert z == pytest.approx(0.04, abs=1e-3)
+    assert z == pytest.approx(CONFIG.CUBE_SIZE[2] / 2, abs=1e-3)
     assert y == pytest.approx(CONFIG.CUBE_INITIAL_Y, abs=1e-4)
     assert theta == pytest.approx(0.0, abs=1e-4)
     assert max(abs(vy), abs(vz), abs(omega)) < 1e-3
@@ -289,12 +362,13 @@ def test_virtual_carriage_links_add_negligible_mass(env):
         assert 0.0 < carriage_mass <= 0.002 * cube_mass
 
 
-# In free air the cube must respond as a 0.1 kg, I = 1.07e-4 kg m^2 rigid body would, so the carriage links do not distort its dynamics
+# In free air the cube must respond as a 0.1 kg, I = 1.13e-4 kg m^2 rigid body would, so the carriage links do not distort its dynamics
 def test_cube_effective_mass_and_inertia(env):
     cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
     duration_steps = 24
     duration = duration_steps / CONFIG.PHYSICS_HZ
 
+    # Place cube in free air
     def released_state():
         # Well clear of the claw and floor
         env.cube.reset(0.3, 0.3, 0.0)
@@ -314,7 +388,7 @@ def test_cube_effective_mass_and_inertia(env):
 
     # Torque about x: alpha = tau / I, with no force coupling into the translational joints
     torque = 1e-3
-    inertia_x = 0.1 / 12 * (0.08 ** 2 + 0.08 ** 2)
+    inertia_x = 0.1 / 12 * (CONFIG.CUBE_SIZE[1] ** 2 + CONFIG.CUBE_SIZE[2] ** 2)
 
     released_state()
     for _ in range(duration_steps):
@@ -361,7 +435,7 @@ def _sweep_finger(env, finger_targets, side, num_steps=60):
 
 # Left finger sweeps across the top of the cube and topples it; only contact forces can do this
 def test_left_finger_contact_rotates_cube(env):
-    first_contact_step, theta_before_contact, thetas, ys = _sweep_finger(env, (0.82, 0.71, 0.78), "left")
+    first_contact_step, theta_before_contact, thetas, ys = _sweep_finger(env, (0.8, 1.0, 0.8), "left")
 
     # The cube stays still until a claw link touches it
     assert first_contact_step is not None
@@ -377,10 +451,10 @@ def test_left_finger_contact_rotates_cube(env):
 
 # The mirrored sweep by the right finger rotates the cube the opposite way
 def test_mirrored_right_finger_contact_rotates_cube_the_opposite_way(env):
-    _, _, left_thetas, _ = _sweep_finger(env, (0.82, 0.71, 0.78), "left")
+    _, _, left_thetas, _ = _sweep_finger(env, (0.8, 1.0, 0.8), "left")
 
     env.reset()
-    _, _, right_thetas, _ = _sweep_finger(env, (-0.82, -0.71, -0.78), "right")
+    _, _, right_thetas, _ = _sweep_finger(env, (-0.8, -1.0, -0.8), "right")
 
     left_extreme = left_thetas[np.argmax(np.abs(left_thetas))]
     right_extreme = right_thetas[np.argmax(np.abs(right_thetas))]
@@ -420,7 +494,7 @@ def test_contact_dynamics_are_applied_to_live_bodies(env):
 
 # Push the upper face of the cube with the left finger using only the real actions: approach clear of the cube, then push
 # The cube's pose is never set after reset, so any rotation comes from claw contact
-def _push_upper_face(env, plane, cube, finger, approach=(-0.8, 1.0, 0.0), push=(-0.3, 1.0, 0.0)):
+def _push_upper_face(env, plane, cube, finger, approach=(-0.8, 0.6, 0.0), push=(-0.3, 1.3, 0.6)):
     env.reset()
 
     cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
@@ -456,11 +530,21 @@ def _push_upper_face(env, plane, cube, finger, approach=(-0.8, 1.0, 0.0), push=(
         final_y=ys[-1])
 
 
+# Push in a fresh environment, so contact history from an earlier push cannot change the outcome
+def _push_in_fresh_env(*frictions):
+    environment = PlanarClawEnv(gui=False)
+
+    try:
+        return _push_upper_face(environment, *frictions)
+    finally:
+        environment.close()
+
+
 # The same off-centre push slides the cube under default friction but tips it under the configured friction
-def test_configured_friction_tips_the_cube_instead_of_sliding_it(env):
-    before = _push_upper_face(env, *[DEFAULT_LATERAL_FRICTION] * 3)
-    after = _push_upper_face(
-        env, CONFIG.PLANE_LATERAL_FRICTION, CONFIG.CUBE_LATERAL_FRICTION, CONFIG.FINGER_LATERAL_FRICTION)
+def test_configured_friction_tips_the_cube_instead_of_sliding_it():
+    before = _push_in_fresh_env(*[DEFAULT_LATERAL_FRICTION] * 3)
+    after = _push_in_fresh_env(
+        CONFIG.PLANE_LATERAL_FRICTION, CONFIG.CUBE_LATERAL_FRICTION, CONFIG.FINGER_LATERAL_FRICTION)
 
     for result in (before, after):
         assert result["contact"] and not result["contact_before_push"]

@@ -2,6 +2,8 @@
 
 from concurrent.futures import ProcessPoolExecutor
 
+import pytest
+
 import config.simulation as CONFIG
 from src.algorithms.reinforce import PolicyNetwork
 from src.parallel_rollout import _worker_identity, collect_trajectories_parallel, init_worker
@@ -61,7 +63,8 @@ def test_final_partial_batch_of_one(pool):
 
 
 # Leading steps compared in the seeding tests
-# Early steps are free-space motion that Bullet reproduces exactly; contact-rich later steps are not bit-identical across process histories
+# The fingers start close to the cube, so even early steps can involve contact, which is not bit-identical across process histories
+# Actions are compared exactly; rewards only loosely, as contact makes the cube's motion depend slightly on earlier episodes
 SEEDING_WINDOW = 10
 
 
@@ -82,7 +85,7 @@ def test_same_snapshot_and_seed_give_same_actions_in_fresh_workers():
         pool_b.shutdown(wait=True)
 
     assert trajectory_a["actions"][:SEEDING_WINDOW] == trajectory_b["actions"][:SEEDING_WINDOW]
-    assert trajectory_a["rewards"][:SEEDING_WINDOW] == trajectory_b["rewards"][:SEEDING_WINDOW]
+    assert trajectory_a["rewards"][:SEEDING_WINDOW] == pytest.approx(trajectory_b["rewards"][:SEEDING_WINDOW], rel=2e-2)
 
 
 # Test that reusing a worker leaks no RNG or policy state between tasks
@@ -103,7 +106,7 @@ def test_same_snapshot_and_seed_give_same_actions_when_a_worker_is_reused():
         single_worker_pool.shutdown(wait=True)
 
     assert first["actions"][:SEEDING_WINDOW] == second["actions"][:SEEDING_WINDOW]
-    assert first["rewards"][:SEEDING_WINDOW] == second["rewards"][:SEEDING_WINDOW]
+    assert first["rewards"][:SEEDING_WINDOW] == pytest.approx(second["rewards"][:SEEDING_WINDOW], rel=2e-2)
 
 
 # Test that different seeds do not accidentally produce identical action sequences
