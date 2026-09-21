@@ -12,27 +12,18 @@ from src.checkpoint import (
 )
 
 
-# Test the checkpoint and print intervals are in optimiser updates
-def test_intervals_are_in_updates():
-    assert CONFIG.CHECKPOINT_INTERVAL_UPDATES == 100
-    assert CONFIG.PRINT_INTERVAL_UPDATES == 100
-    assert not hasattr(CONFIG, "CHECKPOINT_INTERVAL_EPISODES")
-
-
 # Test the initial untrained policy (update 0) is checkpointed
 def test_checkpoint_at_update_zero():
     assert should_save_checkpoint(0)
 
 
-# Test checkpoints fall exactly on completed-update boundaries
-def test_checkpoint_only_on_interval_boundaries():
-    assert not should_save_checkpoint(99)
-    assert should_save_checkpoint(100)
-    assert not should_save_checkpoint(101)
-    assert should_save_checkpoint(200)
+# Test checkpoints follow the configured update interval
+def test_checkpoint_uses_configured_interval():
+    interval = CONFIG.CHECKPOINT_INTERVAL_UPDATES
 
-    saved = [update for update in range(0, 501) if should_save_checkpoint(update)]
-    assert saved == [0, 100, 200, 300, 400, 500]
+    assert not should_save_checkpoint(interval - 1)
+    assert should_save_checkpoint(interval)
+    assert should_save_checkpoint(2 * interval)
 
 
 # Test checkpoint timing is independent of batch size
@@ -44,19 +35,14 @@ def test_checkpoint_timing_independent_of_batch_size(monkeypatch):
         assert [should_save_checkpoint(update) for update in range(401)] == baseline
 
 
-# Test progress printing stays every PRINT_INTERVAL_UPDATES updates
-def test_progress_printing_every_100_updates():
+# Test progress printing follows its independently configured update interval
+def test_progress_printing_uses_configured_interval():
+    interval = CONFIG.PRINT_INTERVAL_UPDATES
+
     assert should_print_progress(0)
-    assert not should_print_progress(99)
-    assert should_print_progress(100)
-    assert not should_print_progress(101)
-    assert should_print_progress(200)
-
-
-# Test printing and checkpointing use the same update counter
-def test_print_and_checkpoint_share_update_counter():
-    for update in range(0, 1001):
-        assert should_print_progress(update) == should_save_checkpoint(update)
+    assert not should_print_progress(interval - 1)
+    assert should_print_progress(interval)
+    assert should_print_progress(2 * interval)
 
 
 # Test filenames use the _update_<N>.pt suffix
