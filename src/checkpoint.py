@@ -1,9 +1,5 @@
 # src/checkpoint.py
-#
-# Training clock, progress and checkpoint scheduling for REINFORCE
-# The clock is completed_updates: the number of optimiser updates already performed
-# completed_updates = 0 is the initial untrained policy
-# Scheduling never depends on batch size or on the number of sampled episodes
+
 
 from datetime import datetime
 

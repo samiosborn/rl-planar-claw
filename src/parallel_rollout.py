@@ -1,8 +1,4 @@
 # src/parallel_rollout.py
-#
-# Multiprocessing-specific logic for sampling trajectories in parallel
-# The policy-gradient mathematics stays in src/algorithms/reinforce.py
-# This module only concerns itself with worker lifecycle and dispatch
 
 import atexit
 import os
@@ -14,9 +10,7 @@ from src.env import PlanarClawEnv
 from src.rollout import sample_episode
 
 
-# Per-worker state, created exactly once per worker process by init_worker
-# A process can only host one PlanarClawEnv at a time (see src/env.py)
-# Each worker reuses this single environment and policy across every task it receives
+# Per-worker state, created exactly once per worker process by init_worker - a process can only host one PlanarClawEnv at a time
 _worker_env = None
 _worker_policy = None
 
@@ -25,21 +19,18 @@ _worker_policy = None
 def init_worker():
     global _worker_env, _worker_policy
 
-    # Parallelism should come from separate worker processes
-    # Not from nested per-process PyTorch thread pools
+    # Parallelism should come from separate worker processes (not from nested per-process PyTorch thread pools)
     torch.set_num_threads(1)
 
     _worker_env = PlanarClawEnv(gui=False)
     _worker_policy = PolicyNetwork()
 
-    # Close this worker's PyBullet connection cleanly when the process exits
+    # Close this worker's PyBullet connection
     atexit.register(_worker_env.close)
 
 
 # Worker task: sample one complete trajectory from a frozen policy snapshot
-# Must be module-level so it can be pickled and sent to worker processes
 def _sample_episode_task(policy_state_dict: dict, seed: int) -> dict:
-    # Forked worker processes inherit the parent's RNG state
     # Seeding per task, with a seed unique to this episode, guarantees independent samples
     torch.manual_seed(seed)
 
@@ -50,14 +41,11 @@ def _sample_episode_task(policy_state_dict: dict, seed: int) -> dict:
 
 
 # Return this worker's process id and environment identity
-# Used only by tests, to confirm worker processes and environments are isolated and reused
 def _worker_identity() -> tuple[int, int]:
     return os.getpid(), id(_worker_env)
 
 
 # Collect batch_size complete trajectories in parallel from one frozen policy snapshot
-# No optimiser update may happen until every trajectory here has been collected
-# This is what keeps a batch on-policy
 def collect_trajectories_parallel(pool, policy_state_dict: dict, batch_size: int, seed_start: int) -> list[dict]:
     # Submit exactly batch_size tasks, each with a seed unique to this batch
     futures = [
@@ -66,5 +54,4 @@ def collect_trajectories_parallel(pool, policy_state_dict: dict, batch_size: int
     ]
 
     # future.result() preserves submission order
-    # Worker exceptions propagate naturally
     return [future.result() for future in futures]

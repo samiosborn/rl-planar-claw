@@ -125,7 +125,7 @@ GAMMA = 0.99
 LEARNING_RATE = 1e-3
 
 # Number of training episodes
-NUM_TRAINING_EPISODES = 25000
+NUM_TRAINING_EPISODES = 50000
 
 # Trajectories per policy-gradient update
 REINFORCE_BATCH_SIZE = 20
@@ -134,16 +134,16 @@ REINFORCE_BATCH_SIZE = 20
 REINFORCE_NUM_WORKERS = 8
 
 # Save a checkpoint every N optimiser updates
-CHECKPOINT_INTERVAL_UPDATES = 100
+CHECKPOINT_INTERVAL_UPDATES = 200
 
 # Print training progress every N updates
-PRINT_INTERVAL_UPDATES = 100
+PRINT_INTERVAL_UPDATES = 200
 
 
 # --- Evaluation / visualisation ---
 
 # Trajectories sampled for the rollout plot
-NUM_ROLLOUT_EPISODES = 30
+NUM_ROLLOUT_EPISODES = 25
 
 # Episodes shown when watching a checkpoint
 REINFORCE_EVALUATION_EPISODES = 5

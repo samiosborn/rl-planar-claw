@@ -573,7 +573,7 @@ $$
 G_t^{(i)}
 \nabla_\theta
 \log
-\pi_\theta(a_t^{(i)} \mid s_t^{(i)}).
+\pi_\theta(a_t^{(i)} \mid s_t^{(i)})
 $$
 
 This sampled estimate forms the basis of the REINFORCE algorithm.

@@ -5,9 +5,7 @@ import torch
 from src.algorithms.reinforce import sample_action
 
 
-# Sample one complete episode under torch.no_grad() (lean training sampler)
-# Returns only the training-relevant trajectory data
-# No log-probabilities, no autograd graph, no returns
+# Sample one complete episode
 def sample_episode(env, policy):
     # Reset environment
     state = env.reset()

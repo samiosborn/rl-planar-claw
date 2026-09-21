@@ -20,8 +20,6 @@ class PolicyNetwork(nn.Module):
 
 
     # Forward pass
-    # Single state [OBSERVATION_DIM] returns logits [NUM_JOINTS, NUM_ACTIONS]
-    # Batch of T states [T, OBSERVATION_DIM] returns logits [T, NUM_JOINTS, NUM_ACTIONS]
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         # Hidden layer (tanh activation)
         hidden = torch.tanh(self.hidden(state))
@@ -30,7 +28,6 @@ class PolicyNetwork(nn.Module):
         output = self.output(hidden)
 
         # Reshape into one categorical distribution per joint
-        # Preserves any leading batch dimension
         logits = output.reshape(
             *state.shape[:-1],
             len(CONFIG.JOINTS),
@@ -61,20 +58,17 @@ def sample_action(policy: PolicyNetwork, state: torch.Tensor) -> tuple[torch.Ten
 
 
 # Score already-chosen actions under the current policy
-# Used to recompute log pi_theta(a_t | s_t) with autograd from stored trajectory data
-# states: [T, OBSERVATION_DIM], actions: [T, NUM_JOINTS]
-# Returns log pi(a_t | s_t) for each timestep: [T]
 def compute_action_log_probs(policy: PolicyNetwork, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
-    # Logits for every timestep in one forward pass: [T, NUM_JOINTS, NUM_ACTIONS]
+    # Logits for every timestep in one forward pass
     logits = policy.forward(states)
 
     # Categorical distribution per joint, per timestep
     distribution = Categorical(logits=logits)
 
-    # Log probability of each joint's chosen action: [T, NUM_JOINTS]
+    # Log probability of each joint's chosen action
     joint_log_probs = distribution.log_prob(actions)
 
-    # log pi(a_t | s_t) = sum_j log pi(a_t,j | s_t): [T]
+    # log pi(a_t | s_t) = sum_j log pi(a_t,j | s_t)
     return joint_log_probs.sum(dim=-1)
 
 
@@ -105,18 +99,11 @@ def compute_policy_loss(log_probs: torch.Tensor, returns: torch.Tensor) -> torch
 
 
 # Compute the REINFORCE loss for one complete trajectory
-# L_i = -sum_t G_i,t log pi_theta(a_i,t | s_i,t)
-# Recomputes log pi_theta(a_t | s_t) from the stored states and actions with autograd enabled
-# So the loss is differentiable with respect to the current (live) policy parameters
 def compute_trajectory_loss(policy: PolicyNetwork, trajectory: dict, gamma: float) -> torch.Tensor:
     # Returns-to-go for this trajectory
-    returns = torch.tensor(
-        compute_returns(trajectory["rewards"], gamma),
-        dtype=torch.float32,
-    )
+    returns = torch.tensor(compute_returns(trajectory["rewards"], gamma), dtype=torch.float32)
 
     # Stored states and actions as tensors, via a single numpy array first
-    # Converting a list of arrays straight to a tensor is far slower
     states = torch.tensor(np.array(trajectory["states"]), dtype=torch.float32)
     actions = torch.tensor(np.array(trajectory["actions"]), dtype=torch.long)
 
@@ -126,11 +113,9 @@ def compute_trajectory_loss(policy: PolicyNetwork, trajectory: dict, gamma: floa
     return compute_policy_loss(log_probs, returns)
 
 
-# Sequential debug path, without multiprocessing
-# Useful for comparing against the parallel path
+# Run episode
 def run_episode(env, policy: PolicyNetwork, gamma: float):
     # Local import avoids a circular import
-    # src.rollout imports sample_action from this module
     from src.rollout import sample_episode
 
     trajectory = sample_episode(env, policy)
@@ -139,27 +124,21 @@ def run_episode(env, policy: PolicyNetwork, gamma: float):
     return trajectory, loss
 
 
-# Train policy from a batch of complete trajectories (Monte Carlo REINFORCE)
-# Trajectories are sampled in parallel across worker processes
-# Gradient estimator: -(1/N) sum_i sum_t G_i,t grad log pi_theta(a_i,t | s_i,t)
-# Gradient descent on this negative objective corresponds to policy-gradient ascent
+# Train policy from a batch of complete trajectories
 def train_batch(pool, policy: PolicyNetwork, optimiser, gamma: float, batch_size: int, seed_start: int):
     # Local import avoids a circular import
-    # src.parallel_rollout imports src.rollout, which imports sample_action from this module
     from src.parallel_rollout import collect_trajectories_parallel
 
     # Clear gradients once for the whole batch
     optimiser.zero_grad()
 
-    # Freeze one explicit CPU copy of the current policy parameters
-    # Every trajectory in this batch is sampled from this exact snapshot
-    # This keeps the batch strictly on-policy
+    # Freeze one explicit CPU copy of the current policy parameters for trajectory sampling (on-policy)
     policy_state_dict = {
         name: tensor.detach().cpu().clone()
         for name, tensor in policy.state_dict().items()
     }
 
-    # Sample batch_size complete trajectories in parallel, under torch.no_grad()
+    # Sample batch_size complete trajectories in parallel
     trajectories = collect_trajectories_parallel(
         pool,
         policy_state_dict,
@@ -175,11 +154,10 @@ def train_batch(pool, policy: PolicyNetwork, optimiser, gamma: float, batch_size
 
     # Recompute log pi_theta(a_t | s_t) with autograd and accumulate gradients
     for trajectory in trajectories:
-        # Recompute the REINFORCE loss for this trajectory against the current (live) policy
+        # Recompute the REINFORCE loss for this trajectory
         loss = compute_trajectory_loss(policy, trajectory, gamma)
 
         # Average trajectory losses by backpropagating loss / N for each trajectory
-        # PyTorch accumulates the resulting gradients
         (loss / len(trajectories)).backward()
 
         # Record diagnostics
@@ -188,14 +166,14 @@ def train_batch(pool, policy: PolicyNetwork, optimiser, gamma: float, batch_size
         undiscounted_returns.append(sum(trajectory["rewards"]))
         discounted_returns.append(compute_returns(trajectory["rewards"], gamma)[0])
 
-    # Gradient norm, computed after all trajectory gradients have accumulated
+    # Gradient norm after all trajectory gradients have been accumulated
     gradient_norm_squared = 0.0
 
     for parameter in policy.parameters():
         if parameter.grad is not None:
             gradient_norm_squared += parameter.grad.pow(2).sum().item()
 
-    # Update policy parameters exactly once for the batch
+    # Update policy parameters
     optimiser.step()
 
     # Debug outputs
