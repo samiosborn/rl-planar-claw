@@ -2,14 +2,7 @@
 
 # Actor-Critic
 
-## From Policy Gradient to Actor-Critic
-
-Actor-critic methods combine two ideas developed separately in the previous notes: policy-gradient optimisation and temporal-difference value estimation.
-
-* The policy-gradient result tells us how the policy should move if we know the advantage of an action.
-* Temporal-difference learning gives us a way to estimate that advantage without waiting for the complete Monte Carlo return.
-
-### Starting Point: The Policy Gradient
+## Policy Gradient
 
 With $J(\theta)$ as the policy objective, the policy gradient is
 
@@ -24,9 +17,7 @@ A^{\pi_\theta}(S_t,A_t)
 \right]
 $$
 
-This is an exact mathematical identity when $A^{\pi_\theta}$ is the true advantage function of the current policy.
-
-#### Two Components of the Gradient
+### Two Components of the Gradient
 
 The gradient contains two distinct quantities:
 
@@ -46,7 +37,7 @@ The policy-gradient theorem therefore gives the direction in which to change the
 
 ---
 
-### The Missing Quantity: Advantage Estimation
+### Advantage Estimation
 
 The definition of the advantage is
 
@@ -56,19 +47,9 @@ A^\pi(s,a)
 Q^\pi(s,a)-V^\pi(s)
 $$
 
-Neither $Q^\pi(s,a)$ nor $V^\pi(s)$ is generally available exactly, so the policy gradient cannot be evaluated directly.
-
 #### Replacing the True Advantage with an Estimate
 
-The exact policy gradient is therefore approximated using sampled experience:
-
-$$
-\nabla_\theta J(\theta)
-\approx
-\hat g
-$$
-
-Replace the true advantage by a sample estimate,
+We use a sample estimate of the advantage,
 
 $$
 A^\pi(S_t,A_t)
@@ -79,6 +60,8 @@ $$
 This gives the stochastic gradient estimator
 
 $$
+\nabla_\theta J(\theta)
+\approx
 \hat g_t
 =
 \hat A_t
@@ -113,7 +96,7 @@ $$
 G_t-V^\pi(S_t)
 $$
 
-Conditioning on $S_t=s$ and $A_t=a$,
+Conditioning on $S_t=s$ and $A_t=a$, we see it is unbiased
 
 $$
 \begin{aligned}
@@ -149,14 +132,6 @@ A^\pi(s,a)
 \end{aligned}
 $$
 
-Thus, when the true value function is used,
-
-$$
-G_t-V^\pi(S_t)
-$$
-
-is an unbiased Monte Carlo estimator of the advantage.
-
 The corresponding REINFORCE-style gradient estimator with a baseline is
 
 $$
@@ -169,35 +144,13 @@ G_t-V^\pi(S_t)
 \log\pi_\theta(A_t\mid S_t)
 $$
 
-The difficulty is that $G_t$ depends on the complete future trajectory, so its randomness can give the policy-gradient estimator high variance.
+The difficulty is that $G_t$ depends on the complete future trajectory, which gives the policy-gradient estimator high variance.
 
 ---
 
-#### Replacing Monte Carlo with Temporal Difference Estimation
+#### Temporal Difference (TD) Advantage Estimation
 
-Temporal-difference learning suggests another possibility.
-
-Instead of using the complete sampled future return, approximate the future after the next state using a value function:
-
-$$
-G_t
-\quad\longrightarrow\quad
-R_{t+1}
-+
-\gamma V(S_{t+1})
-$$
-
-Subtracting the value of the current state gives
-
-$$
-R_{t+1}
-+
-\gamma V(S_{t+1})
--
-V(S_t)
-$$
-
-This is precisely the one-step TD error,
+Consider the one-step TD error,  
 
 $$
 \delta_t
@@ -209,7 +162,7 @@ R_{t+1}
 V(S_t)
 $$
 
-From temporal-difference learning, if $V=V^\pi$,
+If $V=V^\pi$,
 
 $$
 \mathbb{E}
@@ -218,6 +171,8 @@ $$
 \mid
 S_t=s,A_t=a
 \right]
+= 
+Q^\pi(s,a)-V^\pi(s)
 =
 A^\pi(s,a)
 $$
@@ -232,7 +187,7 @@ $$
 
 ---
 
-#### Substituting the TD Error into the Policy Gradient
+#### Policy Gradient Estimation using TD Error 
 
 Substituting $ \hat A_t=\delta_t $ into the stochastic policy-gradient estimator gives
 
@@ -246,9 +201,19 @@ $$
 
 ---
 
-#### Introducing the Learned Critic
+## Actor and Critic Parameterisation
 
-In actor-critic, the value function $V$ is a learned, parametrised function. 
+Actor-critic methods maintain two separate parametrised functions: a policy and a value function.
+
+### The Actor
+
+The actor is the policy $ \pi_\theta(a\mid s) $ where $\theta$ denotes the policy parameters.
+
+Its objective is to adjust $\theta$ so as to increase the expected return $ J(\theta) $.
+
+### The Critic
+
+The critic is a learned approximation to the value function of the current policy where $\phi$ denotes the critic parameters.
 
 $$
 V^\pi(s)
@@ -256,15 +221,333 @@ V^\pi(s)
 V_\phi(s)
 $$
 
-The policy is the **actor**: 
+The critic estimates the expected return from state $s$ under the policy currently induced by the actor.
+
+### Separate Parameter Sets
+
+The actor adjusts $\theta$ to improve the policy
 
 $$
 \pi_\theta(a\mid s)
 $$
 
-The learned value function is the **critic**: 
+While the critic adjusts $\phi$ to improve the approximation
 
 $$
 V_\phi(s)
+\approx
+V^{\pi_\theta}(s)
 $$
 
+The important coupling is that the critic is estimating the value function of the policy defined by the current actor.
+
+Therefore, as $\theta$ changes, the target value function also changes, which will likely change $\phi$ for it to be optimal. 
+
+---
+
+## Learning the Critic
+
+The critic approximates the state-value function of the current policy
+
+$$
+V_\phi(s)
+\approx
+V^{\pi_\theta}(s)
+$$
+
+The critic parameters $\phi$ must therefore be learned from sampled transitions.
+
+### Bootstrapped Value Target
+
+From the Bellman expectation equation,
+
+$$
+V^{\pi_\theta}(s)
+=
+\mathbb{E}_{\pi_\theta}
+\left[
+R_{t+1}
++
+\gamma V^{\pi_\theta}(S_{t+1})
+\mid
+S_t=s
+\right]
+$$
+
+For a sampled transition $ (S_t,A_t,R_{t+1},S_{t+1}) $
+
+We construct the one-step TD target for the critic
+
+$$
+y_t
+=
+R_{t+1}
++
+\gamma V_\phi(S_{t+1})
+$$
+
+The target contains two sources of approximation:
+
+* $R_{t+1}$ and $S_{t+1}$ are a single sample from the environment
+* $V_\phi(S_{t+1})$ approximates $V^{\pi_\theta}(S_{t+1})$
+
+---
+
+### Critic Loss
+
+Define the squared value loss
+
+$$
+L_V(\phi)
+=
+\frac{1}{2}
+\left(
+y_t
+-
+V_\phi(S_t)
+\right)^2
+$$
+
+Recall that the TD error is
+
+$$
+\delta_t
+=
+R_{t+1}
++
+\gamma V_\phi(S_{t+1})
+-
+V_\phi(S_t)
+$$
+
+Therefore
+
+$$
+\delta_t
+=
+y_t
+-
+V_\phi(S_t)
+$$
+
+Thus
+
+$$
+L_V(\phi)
+=
+\frac{1}{2}\delta_t^2
+$$
+
+---
+
+### Gradient of the Critic Loss
+
+For the standard TD update, treat $y_t$ as fixed while differentiating the current prediction.
+
+Apply the chain rule
+
+$$
+\begin{aligned}
+\nabla_\phi L_V(\phi)
+&=
+\frac{1}{2}
+\cdot
+2
+\left(
+y_t-V_\phi(S_t)
+\right)
+\nabla_\phi
+\left(
+y_t-V_\phi(S_t)
+\right)
+\\
+&=
+\left(
+y_t-V_\phi(S_t)
+\right)
+\left(
+-\nabla_\phi V_\phi(S_t)
+\right)
+\\
+&=
+-
+\left(
+y_t-V_\phi(S_t)
+\right)
+\nabla_\phi V_\phi(S_t)
+\end{aligned}
+$$
+
+Using
+
+$$
+\delta_t
+=
+y_t-V_\phi(S_t)
+$$
+
+Gives
+
+$$
+\nabla_\phi L_V(\phi)
+=
+-\delta_t
+\nabla_\phi V_\phi(S_t)
+$$
+
+Standard gradient descent is
+
+$$
+\begin{aligned}
+\phi
+&\leftarrow
+\phi
+-
+\alpha_\phi
+\nabla_\phi L_V(\phi)
+\end{aligned}
+$$
+
+Using our formulation
+$$
+\begin{aligned}
+\phi
+&\leftarrow
+\phi 
++
+\alpha_\phi
+\delta_t
+\nabla_\phi V_\phi(S_t)
+\end{aligned}
+$$
+
+This is the function-approximation form of the TD value update.
+
+---
+
+#### Semi-Gradient TD
+
+Note how the target itself depends on $\phi$: 
+
+$$
+y_t
+=
+R_{t+1}
++
+\gamma V_\phi(S_{t+1})
+$$
+
+If the entire loss were differentiated with respect to $\phi$, then
+
+$$
+\nabla_\phi y_t
+=
+\gamma
+\nabla_\phi
+V_\phi(S_{t+1})
+$$
+
+Therefore
+
+$$
+\nabla_\phi
+\left(
+y_t-V_\phi(S_t)
+\right)
+=
+\gamma\nabla_\phi V_\phi(S_{t+1})
+-
+\nabla_\phi V_\phi(S_t)
+$$
+
+The full gradient of the squared TD error would then be
+
+$$
+\nabla_\phi L_V(\phi)
+=
+\delta_t
+\left[
+\gamma\nabla_\phi V_\phi(S_{t+1})
+-
+\nabla_\phi V_\phi(S_t)
+\right]
+$$
+
+Instead, TD learning holds the target fixed while updating the prediction at $S_t$ so that $ \nabla_\phi y_t = 0 $
+
+This gives the previous - which we call the semi gradient: 
+
+$$
+\nabla_\phi L_V(\phi)
+=
+-\delta_t
+\nabla_\phi V_\phi(S_t)
+$$
+
+---
+
+## Actor Update
+
+From the policy-gradient estimator,
+
+$$
+\hat g_t
+=
+\hat A_t
+\nabla_\theta
+\log\pi_\theta(A_t\mid S_t)
+$$
+
+### TD Error as the Advantage Estimate
+
+Using the 1-step TD error, $ \hat A_t = \delta_t $
+
+Substituting this into the policy-gradient estimator gives
+
+$$
+\hat g_t
+=
+\delta_t
+\nabla_\theta
+\log\pi_\theta(A_t\mid S_t)
+$$
+
+---
+
+### Actor Update Rule
+
+The actor performs gradient ascent on the policy objective
+
+$$
+\theta
+\leftarrow
+\theta
++
+\alpha_\theta
+\hat g_t
+$$
+
+Therefore
+
+$$
+\theta
+\leftarrow
+\theta
++
+\alpha_\theta
+\delta_t
+\nabla_\theta
+\log\pi_\theta(A_t\mid S_t)
+$$
+
+where $\alpha_\theta$ is the actor learning rate.
+
+During the actor update, $\delta_t$ is treated as the scalar advantage estimate supplied by the critic. Thus the critic determines the weighting applied to the policy gradient.
+
+The sign of $\delta_t$ determines how the probability of the sampled action changes.
+
+* If $ \delta_t > 0 $, then the observed transition was better than predicted by the critic, so gradient ascent increases the probability of the sampled action.
+
+* If $ \delta_t < 0 $, then the observed transition was worse than predicted, so the probability of the sampled action is decreased.
+
+---
