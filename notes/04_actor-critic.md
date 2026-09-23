@@ -551,3 +551,159 @@ The sign of $\delta_t$ determines how the probability of the sampled action chan
 * If $ \delta_t < 0 $, then the observed transition was worse than predicted, so the probability of the sampled action is decreased.
 
 ---
+
+## Estimator Bias and Variance
+
+### Approximate Critic
+
+Define the critic error
+
+$$
+\epsilon_\phi(s)
+=
+V_\phi(s)-V^\pi(s)
+$$
+
+Substitute the critic error into the TD error
+
+$$
+\delta_t
+=
+R_{t+1}
++
+\gamma V_\phi(S_{t+1})
+-
+V_\phi(S_t)
+$$
+
+
+$$
+\begin{aligned}
+\delta_t
+&=
+R_{t+1}
++
+\gamma
+\left[
+V^\pi(S_{t+1})
++
+\epsilon_\phi(S_{t+1})
+\right]
+-
+\left[
+V^\pi(S_t)
++
+\epsilon_\phi(S_t)
+\right]
+\\
+&=
+R_{t+1}
++
+\gamma V^\pi(S_{t+1})
+-
+V^\pi(S_t)
++
+\gamma\epsilon_\phi(S_{t+1})
+-
+\epsilon_\phi(S_t)
+\end{aligned}
+$$
+
+Therefore
+
+$$
+\mathbb{E}[\delta_t\mid S_t,A_t]
+=
+A^\pi(S_t,A_t)
++
+\gamma
+\mathbb{E}
+\left[
+\epsilon_\phi(S_{t+1})
+\mid
+S_t,A_t
+\right]
+-
+\epsilon_\phi(S_t)
+$$
+
+The critic error $ -\epsilon_\phi(S_t) $ depends only on the state and therefore acts as an action-independent baseline.
+
+---
+
+### Bias in the Actor Update
+
+From the baseline result,
+
+$$
+\mathbb{E}
+\left[
+\epsilon_\phi(S_t)
+\nabla_\theta
+\log\pi_\theta(A_t\mid S_t)
+\right]
+=
+0
+$$
+
+Therefore the current-state critic error does not itself bias the expected policy gradient (actor update).
+
+The remaining error comes from the bootstrapped next-state value which can depend on the chosen action.
+
+$$
+\gamma
+\mathbb{E}
+\left[
+\epsilon_\phi(S_{t+1})
+\mid
+S_t,A_t
+\right]
+$$
+
+Thus, in general, when the bootstrapped critic is imperfect,
+
+$$
+\mathbb{E}[\hat g_t]
+\neq
+\nabla_\theta J(\theta)
+$$
+
+---
+
+### Baseline Error vs Bootstrapping Error
+
+This distinction is important.
+
+A Monte Carlo estimator using an approximate baseline,
+
+$$
+\hat A_t^{\mathrm{MC}}
+=
+G_t-V_\phi(S_t)
+$$
+
+does not introduce bias into the expected policy gradient purely because $V_\phi$ is inaccurate, since $V_\phi(S_t)$ is still action-independent.
+
+By contrast, one-step actor-critic uses
+
+$$
+\hat A_t^{\mathrm{TD}}
+=
+R_{t+1}
++
+\gamma V_\phi(S_{t+1})
+-
+V_\phi(S_t)
+$$
+
+The term
+
+$$
+V_\phi(S_{t+1})
+$$
+
+depends on the next state, whose distribution depends on the current action. Error in this bootstrapped value estimate can therefore bias the actor update.
+
+Actor-critic trades some of the variance of Monte Carlo estimation for bias introduced by bootstrapping from an approximate critic. 
+
+---
