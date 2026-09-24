@@ -672,19 +672,14 @@ $$
 
 ### Baseline Error vs Bootstrapping Error
 
-This distinction is important.
-
-A Monte Carlo estimator using an approximate baseline,
+For the Monte Carlo estimator the approximation error in $V_\phi$ does not alter the expectation of the policy-gradient estimator. Since $V_\phi(S_t)$ is independent of the sampled action conditional on $S_t$, its contribution has zero expectation under the policy.
 
 $$
 \hat A_t^{\mathrm{MC}}
 =
 G_t-V_\phi(S_t)
 $$
-
-does not introduce bias into the expected policy gradient purely because $V_\phi$ is inaccurate, since $V_\phi(S_t)$ is still action-independent.
-
-By contrast, one-step actor-critic uses
+By contrast, one-step actor-critic uses the bootstrapped estimator, in which the term $V_\phi(S_{t+1})$ depends on the next-state distribution, which in turn depends on the chosen action. Consequently, approximation error in the bootstrapped next-state value need not vanish in expectation and can therefore bias the actor update.
 
 $$
 \hat A_t^{\mathrm{TD}}
@@ -696,14 +691,166 @@ R_{t+1}
 V_\phi(S_t)
 $$
 
-The term
+---
+
+## Two-Timescale Actor-Critic
+
+Actor-critic consists of two coupled stochastic approximation procedures.
+
+The critic update is
 
 $$
-V_\phi(S_{t+1})
+\phi_{t+1}
+=
+\phi_t
++
+\alpha_t
+\delta_t
+\nabla_\phi V_{\phi_t}(S_t)
 $$
 
-depends on the next state, whose distribution depends on the current action. Error in this bootstrapped value estimate can therefore bias the actor update.
+The actor update is
 
-Actor-critic trades some of the variance of Monte Carlo estimation for bias introduced by bootstrapping from an approximate critic. 
+$$
+\theta_{t+1}
+=
+\theta_t
++
+\beta_t
+\delta_t
+\nabla_\theta
+\log \pi_{\theta_t}(A_t\mid S_t)
+$$
+
+where $\alpha_t$ and $\beta_t$ are the critic and actor step sizes respectively.
+
+The difficulty is that the critic attempts to estimate $ V^{\pi_{\theta_t}} $ while the policy itself is changing.
+
+---
+
+### Critic Tracking
+
+For a fixed policy $\pi_\theta$, suppose critic learning converges towards parameters $ \phi^*(\theta) $ such that $ V_{\phi^*(\theta)} \approx V^{\pi_\theta} $
+
+The critic target therefore depends on the actor parameters. As $\theta_t$ changes, the critic must track the moving solution $  \phi^*(\theta_t) $
+
+If the actor changes too quickly, the critic may never be a good approximation to the value function of the current policy.
+
+---
+
+### Two Timescales
+
+To separate the two learning processes, choose the step sizes such that
+
+$$
+\frac{\beta_t}{\alpha_t}
+\rightarrow
+0
+$$
+
+So that asymptotically $ \beta_t \ll \alpha_t $
+
+The critic therefore evolves on a faster timescale than the actor.
+
+From the critic's perspective, changes in $\theta_t$ are negligible over the timescale on which $\phi_t$ changes. The actor can therefore be treated as approximately fixed while the critic approaches $ \phi_t \approx \phi^*(\theta_t) $
+
+Conversely, on the slower actor timescale, the critic can be treated as approximately equilibrated to the current policy.
+
+For standard stochastic approximation results, the step sizes also satisfy
+
+$$
+\sum_{t=0}^{\infty}\alpha_t
+=
+\infty,
+\qquad
+\sum_{t=0}^{\infty}\alpha_t^2
+<
+\infty
+$$
+
+With
+
+$$
+\sum_{t=0}^{\infty}\beta_t
+=
+\infty,
+\qquad
+\sum_{t=0}^{\infty}\beta_t^2
+<
+\infty
+$$
+
+The first condition prevents learning from stopping too early, while the second controls the accumulated stochastic noise.
+
+---
+
+### Stochastic Approximation View
+
+More generally, write the coupled updates as
+
+$$
+\phi_{t+1}
+=
+\phi_t
++
+\alpha_t
+H(\theta_t,\phi_t,\xi_t)
+$$
+
+$$
+\theta_{t+1}
+=
+\theta_t
++
+\beta_t
+G(\theta_t,\phi_t,\xi_t)
+$$
+
+where $\xi_t$ represents the randomness in the sampled transition.
+
+Define the expected critic update
+
+$$
+h(\theta,\phi)
+=
+\mathbb{E}
+\left[
+H(\theta,\phi,\xi)
+\right]
+$$
+
+For fixed $\theta$, suppose the critic has a stable equilibrium satisfying
+
+$$
+h(\theta,\phi^*(\theta))
+=
+0
+$$
+
+Then, because the critic evolves on the faster timescale,
+
+$$
+\phi_t
+\approx
+\phi^*(\theta_t)
+$$
+
+The actor approximately evolves according to
+
+$$
+\theta_{t+1}
+=
+\theta_t
++
+\beta_t
+G
+\left(
+\theta_t,
+\phi^*(\theta_t),
+\xi_t
+\right)
+$$
+
+The two-timescale construction therefore replaces a fully coupled system with a nested approximation: the critic is treated as approximately equilibrated while analysing the slower actor dynamics.
 
 ---
