@@ -34,8 +34,6 @@ $$
 
 Thus $V^\pi(s)$ measures how valuable it is, in expectation, to be in state $s$ while following policy $\pi$.
 
----
-
 **Definition — Action-Value Function**
 
 The action-value function under policy $\pi$ is the expected return when starting in state $s$, taking action $a$, and subsequently following $\pi$:
@@ -52,33 +50,27 @@ A_t=a
 \right]
 $$
 
-Thus $Q^\pi(s,a)$ measures the expected long-term value of choosing action $a$ in state $s$.
+Thus $Q^\pi(s,a)$ measures the expected value of choosing action $a$ in state $s$.
 
 ---
 
 ## Bellman Expectation Equations
 
-The return can be decomposed recursively.
-
-Starting from
+The return can be decomposed recursively:
 
 $$
+\begin{aligned}
 G_t
-=
+&=
 R_{t+1}
 +
 \gamma R_{t+2}
 +
 \gamma^2 R_{t+3}
 +
-\cdots,
-$$
-
-If we factor out the first reward:
-
-$$
-G_t
-=
+\cdots
+\\
+&=
 R_{t+1}
 +
 \gamma
@@ -89,17 +81,19 @@ R_{t+2}
 +
 \cdots
 \right)
-=
+\\
+&=
 R_{t+1}
 +
 \gamma G_{t+1}
+\end{aligned}
 $$
 
-This recursive structure of the return gives the Bellman expectation equations.
+This recursive structure gives the Bellman expectation equations.
 
 ### State-Value Bellman Equation
 
-Starting from the definition
+Starting from
 
 $$
 V^\pi(s)
@@ -155,9 +149,7 @@ S_t=s
 \right]
 $$
 
-The value of the current state is therefore equal to the expected immediate reward plus the discounted value of the next state.
-
-For a discrete MDP (where both the actions and state is discrete), this can be written explicitly as
+For a discrete MDP this can be written explicitly as
 
 $$
 V^\pi(s)
@@ -171,11 +163,9 @@ r+\gamma V^\pi(s')
 \right]
 $$
 
----
-
 ### Action-Value Bellman Equation
 
-Starting from the definition
+Starting from
 
 $$
 Q^\pi(s,a)
@@ -221,7 +211,7 @@ A_t=a
 \right]
 $$
 
-For a discrete-state MDP
+For a discrete action space,
 
 $$
 Q^\pi(s,a)
@@ -246,7 +236,7 @@ $$
 
 **Definition — Bellman Expectation Operator**
 
-For a policy $\pi$, define the Bellman expectation operator $\mathcal{T}^\pi$ acting on an arbitrary value function $V$ by
+For a policy $\pi$, define the Bellman expectation operator $\mathcal{T}^\pi$ acting on a value function $V$ by
 
 $$
 (\mathcal{T}^\pi V)(s)
@@ -261,19 +251,17 @@ S_t=s
 \right]
 $$
 
-The true value function $V^\pi$ satisfies the below and is therefore a fixed point of the Bellman operator.
+The true value function is a fixed point of the Bellman operator:
 
 $$
-V^\pi
-=
 \mathcal{T}^\pi V^\pi
+=
+V^\pi
 $$
-
----
 
 ### Contraction Property
 
-For two value functions $V$ and $W$, the Bellman expectation operator satisfies
+For two bounded value functions $V$ and $W$,
 
 $$
 \left\|
@@ -288,9 +276,7 @@ V-W
 \right\|_\infty
 $$
 
-Since $0 \leq \gamma < 1$, applying the Bellman operator reduces the maximum distance between two value functions.
-
-Repeated Bellman updates therefore converge towards the unique fixed point $V^\pi$:
+Since $0 \leq \gamma < 1$, $\mathcal{T}^\pi$ is a contraction under the supremum norm. Repeated Bellman updates therefore converge to the unique fixed point $V^\pi$:
 
 $$
 V_{k+1}
@@ -304,42 +290,13 @@ V_k
 V^\pi
 $$
 
-This provides the mathematical basis for iterative methods that estimate value functions.
-
 ---
 
 ## Monte Carlo Estimation
 
-The Bellman equations define value functions as expectations, but these expectations are generally unknown.
+The Bellman equations define value functions as expectations, but these expectations are generally unknown. One approach is to estimate them directly from sampled trajectories.
 
-One approach is to estimate them directly from sampled trajectories.
-
-Suppose a trajectory produces rewards
-
-$$
-R_{t+1},
-R_{t+2},
-\ldots,
-R_T
-$$
-
-The observed return from time $t$ is
-
-$$
-G_t
-=
-R_{t+1}
-+
-\gamma R_{t+2}
-+
-\gamma^2 R_{t+3}
-+
-\cdots
-+
-\gamma^{T-t-1}R_T
-$$
-
-Or equivalently,
+For an episodic trajectory, the observed return from time $t$ is
 
 $$
 G_t
@@ -348,7 +305,7 @@ G_t
 \gamma^k R_{t+k+1}
 $$
 
-Stating the definition
+Since
 
 $$
 V^\pi(s)
@@ -370,7 +327,7 @@ G^{(2)},
 G^{(N)}
 $$
 
-The value function can be estimated by the sample mean:
+The value function can be estimated by
 
 $$
 V^\pi(s)
@@ -380,97 +337,56 @@ V^\pi(s)
 G^{(i)}
 $$
 
-This is a Monte Carlo estimate of the state value.
-
----
-
 **Definition — Monte Carlo Prediction Error**
 
-$$
-\text{Monte Carlo Prediction Error} = G_t - V(S_t)
-$$
-
-The expected reward-to-go should converge to the true value function so this difference is the error. 
-
----
-
-Equivalently, the value estimate can be updated incrementally:
+For a value estimate $V$, define the Monte Carlo prediction error as
 
 $$
-V(s)
+e_t^{\mathrm{MC}}
+=
+G_t-V(S_t)
+$$
+
+The corresponding incremental update is
+
+$$
+V(S_t)
 \leftarrow
-V(s)
+V(S_t)
 +
 \alpha
 \left[
-G_t-V(s)
+G_t-V(S_t)
 \right]
 $$
 
-Where $\alpha$ is the learning rate.
+The Monte Carlo update moves $V(S_t)$ towards the complete observed return $G_t$. It therefore does not bootstrap from a future value estimate.
 
-Monte Carlo estimation of the value function uses the actual sampled future rewards as its target for updating:
+However, $G_t$ is not available until the future rewards have been observed. This motivates temporal-difference learning, which replaces the complete return with a bootstrapped target.
 
-$$
-\text{Monte Carlo target}
-=
-G_t
-$$
-
-It therefore does not require an estimate of the value of a future state, i.e. to update $V(S_t)$ we do not need $V(S_{t+1})$. 
-
-However, the complete return $G_t$ is not known until all future rewards have been observed. In an episodic problem, this commonly means waiting until the trajectory has progressed to termination before the earlier states can be updated.
-
-This motivates temporal-difference learning: instead of waiting for the complete return, estimate part of the future using the current value function.
+---
 
 ## Temporal-Difference Learning
 
-Temporal-difference learning updates a value estimate using the observed immediate reward together with an estimate of the value of the next state.
+Temporal-difference learning updates a value estimate using observed rewards together with an estimate of a future state's value.
 
-Unlike Monte Carlo methods, it does not wait for the complete return $G_t$ to be observed.
+### TD Target and TD Error
 
----
-
-### TD Target
-
-For one-step temporal-difference learning, the TD target is
+**Definition — One-Step TD Target**
 
 $$
-\text{TD target}
+y_t^{\mathrm{TD}}
 =
 R_{t+1}
 +
 \gamma V(S_{t+1})
 $$
 
-The update is
-
-$$
-V(S_t)
-\leftarrow
-V(S_t)
-+
-\alpha
-\left[
-R_{t+1}
-+
-\gamma V(S_{t+1})
--
-V(S_t)
-\right]
-$$
-
-Because the TD target depends on another value estimate, TD learning is a bootstrapping method.
-
----
-
-### TD Error
+Because the target depends on another value estimate, TD learning is a bootstrapping method.
 
 **Definition — Temporal-Difference Error**
 
-The temporal-difference error is the difference between the TD target and the current value estimate. 
-
-For one-step TD learning,  
+The TD error is the difference between the TD target and the current value estimate:
 
 $$
 \delta_t
@@ -482,7 +398,7 @@ R_{t+1}
 V(S_t)
 $$
 
-The TD update can therefore be written as
+The one-step TD update is therefore
 
 $$
 V(S_t)
@@ -492,11 +408,9 @@ V(S_t)
 \alpha \delta_t
 $$
 
----
-
 ### TD Error as an Advantage Estimate
 
-Recall that the advantage function is
+Recall
 
 $$
 A^\pi(s,a)
@@ -506,9 +420,10 @@ Q^\pi(s,a)
 V^\pi(s)
 $$
 
-Then the expected TD error conditioned on the current state and action is
+Suppose the TD error is formed using the exact value function $V^\pi$. Then
 
 $$
+\begin{aligned}
 \mathbb{E}_\pi
 \left[
 \delta_t
@@ -516,7 +431,7 @@ $$
 S_t=s,\,
 A_t=a
 \right]
-= 
+&=
 \mathbb{E}_\pi
 \left[
 R_{t+1}
@@ -528,19 +443,8 @@ V^\pi(S_t)
 S_t=s,\,
 A_t=a
 \right]
-$$
-
-Since $V^\pi(S_t)=V^\pi(s)$ is fixed under the conditioning,
-
-$$
-\mathbb{E}_\pi
-\left[
-\delta_t
-\mid
-S_t=s,\,
-A_t=a
-\right]
-= 
+\\
+&=
 \mathbb{E}_\pi
 \left[
 R_{t+1}
@@ -552,65 +456,33 @@ A_t=a
 \right]
 -
 V^\pi(s)
-$$
-
-By the Bellman equation for the action-value function,
-
-$$
-\mathbb{E}_\pi
-\left[
-\delta_t
-\mid
-S_t=s,\,
-A_t=a
-\right]
-= 
+\\
+&=
 Q^\pi(s,a)
 -
 V^\pi(s)
-$$
-
-Therefore,
-
-$$
-\mathbb{E}_\pi
-\left[
-\delta_t
-\mid
-S_t=s,\,
-A_t=a
-\right]
-=
+\\
+&=
 A^\pi(s,a)
+\end{aligned}
 $$
 
-Thus, when the value function is accurate, the TD error provides a one-step sample estimate of the advantage.
-
-This is an important connection between value learning and policy-gradient methods.
-
----
+Thus, with an exact value function, $\delta_t$ is a one-step unbiased estimator of the advantage conditional on $(S_t,A_t)$.
 
 ### n-Step Returns
 
 **Definition — n-Step Return**
 
-The $n$-step return from time $t$ is
+For a value estimate $V$, the $n$-step return is
 
 $$
 G_t^{(n)}
 =
-R_{t+1}
-+
-\gamma R_{t+2}
-+
-\cdots
-+
-\gamma^{n-1}R_{t+n}
+\sum_{l=0}^{n-1}
+\gamma^l R_{t+l+1}
 +
 \gamma^n V(S_{t+n})
 $$
-
----
 
 For $n=1$,
 
@@ -622,23 +494,9 @@ R_{t+1}
 \gamma V(S_{t+1})
 $$
 
-Which is the ordinary one-step TD target.
+which is the one-step TD target.
 
-For $n=2$,
-
-$$
-G_t^{(2)}
-=
-R_{t+1}
-+
-\gamma R_{t+2}
-+
-\gamma^2 V(S_{t+2})
-$$
-
-As $n$ increases, the estimate relies on more observed rewards and less on bootstrapping.
-
-For an episodic task, if $n$ extends all the way to the end of the episode, then
+As $n$ increases, more observed rewards are used before bootstrapping. In an episodic task, if the return extends to termination,
 
 $$
 G_t^{(n)}
@@ -646,31 +504,102 @@ G_t^{(n)}
 G_t
 $$
 
-Im this case, the $n$-step return in TD learning becomes the Monte Carlo return.
+and the $n$-step return becomes the Monte Carlo return.
 
-## Lambda Returns
+### n-Step Advantage Estimates
 
-Recall the n-step return
+Let the value estimate be a learned critic $V_\phi$. Define the corresponding $n$-step advantage estimate by
+
+$$
+\hat A_t^{(n)}
+=
+G_t^{(n)}
+-
+V_\phi(S_t)
+$$
+
+where
 
 $$
 G_t^{(n)}
 =
+\sum_{l=0}^{n-1}
+\gamma^l R_{t+l+1}
++
+\gamma^n V_\phi(S_{t+n})
+$$
+
+and define the TD residual using the same critic:
+
+$$
+\delta_t
+=
+R_{t+1}
++
+\gamma V_\phi(S_{t+1})
+-
+V_\phi(S_t)
+$$
+
+For $n=2$,
+
+$$
+\begin{aligned}
+\delta_t
++
+\gamma\delta_{t+1}
+&=
+R_{t+1}
++
+\gamma V_\phi(S_{t+1})
+-
+V_\phi(S_t)
+\\
+&\quad+
+\gamma R_{t+2}
++
+\gamma^2V_\phi(S_{t+2})
+-
+\gamma V_\phi(S_{t+1})
+\\
+&=
 R_{t+1}
 +
 \gamma R_{t+2}
 +
-\cdots
-+
-\gamma^{n-1}R_{t+n}
-+
-\gamma^n V(S_{t+n})
+\gamma^2V_\phi(S_{t+2})
+-
+V_\phi(S_t)
+\\
+&=
+G_t^{(2)}
+-
+V_\phi(S_t)
+\end{aligned}
 $$
+
+The intermediate value terms cancel in the same way for general $n$, giving the exact identity
+
+$$
+\boxed{
+\hat A_t^{(n)}
+=
+\sum_{l=0}^{n-1}
+\gamma^l\delta_{t+l}
+}
+$$
+
+This identity is exact for any $V_\phi$. Whether $\hat A_t^{(n)}$ accurately estimates $A^\pi(S_t,A_t)$ depends on the critic and the amount of bootstrapping.
 
 ---
 
+## Lambda Returns and Generalised Advantage Estimation
+
+### Lambda Return
+
 **Definition — Lambda Return**
 
-The $\lambda$-return is
+For $0 \leq \lambda < 1$, the $\lambda$-return is the geometrically weighted average of $n$-step returns:
 
 $$
 G_t^\lambda
@@ -681,9 +610,7 @@ G_t^\lambda
 G_t^{(n)}
 $$
 
-The $\lambda$-return is a weighted average of n-step returns.
-
-Since for $ 0 \leq \lambda \leq 1 $, 
+The weights sum to one:
 
 $$
 (1-\lambda)
@@ -693,13 +620,7 @@ $$
 1
 $$
 
-
-
----
-
-### Recursive Form
-
-The $\lambda$-return can also be expressed recursively as
+The $\lambda$-return also satisfies the recursion
 
 $$
 G_t^\lambda
@@ -714,9 +635,7 @@ R_{t+1}
 \right]
 $$
 
-With probability weight $1-\lambda$ the return effectively bootstraps from $V(S_{t+1})$, and with weight $\lambda$ it continues incorporating information from later rewards.
-
-The value function can then be updated towards the $\lambda$-return:
+The value estimate can therefore be updated towards $G_t^\lambda$:
 
 $$
 V(S_t)
@@ -731,27 +650,133 @@ V(S_t)
 \right]
 $$
 
----
+For an episodic task, $\lambda=1$ is understood as the limiting case in which the target becomes the complete Monte Carlo return.
+
+### Generalised Advantage Estimation
+
+**Definition — Generalised Advantage Estimation**
+
+Generalised advantage estimation applies the same geometric weighting to the $n$-step advantage estimates:
+
+$$
+\hat A_t^{\mathrm{GAE}(\gamma,\lambda)}
+=
+(1-\lambda)
+\sum_{n=1}^{\infty}
+\lambda^{n-1}
+\hat A_t^{(n)}
+$$
+
+Using
+
+$$
+\hat A_t^{(n)}
+=
+\sum_{l=0}^{n-1}
+\gamma^l\delta_{t+l}
+$$
+
+we obtain
+
+$$
+\begin{aligned}
+\hat A_t^{\mathrm{GAE}(\gamma,\lambda)}
+&=
+(1-\lambda)
+\sum_{n=1}^{\infty}
+\lambda^{n-1}
+\sum_{l=0}^{n-1}
+\gamma^l\delta_{t+l}
+\\
+&=
+\sum_{l=0}^{\infty}
+\gamma^l\delta_{t+l}
+(1-\lambda)
+\sum_{n=l+1}^{\infty}
+\lambda^{n-1}
+\\
+&=
+\sum_{l=0}^{\infty}
+\gamma^l\delta_{t+l}
+(1-\lambda)
+\frac{\lambda^l}{1-\lambda}
+\\
+&=
+\boxed{
+\sum_{l=0}^{\infty}
+(\gamma\lambda)^l
+\delta_{t+l}
+}
+\end{aligned}
+$$
+
+Thus GAE is an exponentially weighted sum of future TD residuals.
+
+Because the weights in the $\lambda$-return sum to one,
+
+$$
+\begin{aligned}
+G_t^\lambda
+-
+V_\phi(S_t)
+&=
+(1-\lambda)
+\sum_{n=1}^{\infty}
+\lambda^{n-1}
+\left[
+G_t^{(n)}
+-
+V_\phi(S_t)
+\right]
+\\
+&=
+\hat A_t^{\mathrm{GAE}(\gamma,\lambda)}
+\end{aligned}
+$$
+
+Hence the exact identity
+
+$$
+\boxed{
+\hat A_t^{\mathrm{GAE}(\gamma,\lambda)}
+=
+G_t^\lambda
+-
+V_\phi(S_t)
+}
+$$
 
 ### Limiting Cases
 
-As $ \lambda \rightarrow 1 $, more weight is placed on long-horizon returns.
+When $\lambda=0$,
 
-When $ \lambda=0 $, this becomes the one-step TD target. 
+$$
+\hat A_t^{\mathrm{GAE}(\gamma,0)}
+=
+\delta_t
+$$
 
-For an episodic problem, the limiting case $ \lambda=1 $ corresponds to the complete Monte Carlo return: $ G_t^1 = G_t $
+so GAE reduces to the one-step TD advantage estimate.
 
-Intermediate values of $\lambda$ interpolate between these two extremes. 
+For an episodic task, when $\lambda=1$,
 
-The purpose of intermediate values of $\lambda$ is not to eliminate bias or variance, but to find a useful balance between them.
+$$
+\hat A_t^{\mathrm{GAE}(\gamma,1)}
+=
+G_t
+-
+V_\phi(S_t)
+$$
+
+so the advantage estimate becomes the Monte Carlo return minus the critic baseline.
+
+Intermediate values of $\lambda$ interpolate between these cases.
 
 ---
 
 ## Bias-Variance Trade-off
 
-The choice between Monte Carlo, one-step TD, and intermediate $n$-step or $\lambda$-return methods involves a trade-off between bias and variance.
-
-### Monte Carlo
+Monte Carlo, one-step TD, $n$-step returns, and GAE differ in how much they rely on sampled rewards versus bootstrapping.
 
 Monte Carlo uses the complete observed return
 
@@ -767,36 +792,33 @@ R_{t+1}
 \cdots
 $$
 
-It does not bootstrap from the current value estimate.
+It does not bootstrap from the current value estimate, so its target does not directly inherit critic approximation error. It instead depends on the full stochastic future trajectory and therefore commonly has high variance.
 
-Therefore, the target does not inherit error directly from an inaccurate estimate $V(S_{t+1})$. 
-
-However, $G_t$ depends on the entire stochastic future trajectory. 
-
-Different trajectories starting from the same state may therefore produce substantially different returns. 
-
-Monte Carlo methods consequently tend to have low bias and high variance in their return estimates. 
-
----
-
-### n-Step Returns
-
-The $n$-step return provides a spectrum between these cases:
+The $n$-step return
 
 $$
 G_t^{(n)}
 =
-R_{t+1}
-+
-\cdots
-+
-\gamma^{n-1}R_{t+n}
+\sum_{l=0}^{n-1}
+\gamma^l R_{t+l+1}
 +
 \gamma^nV(S_{t+n})
 $$
 
-For small $n$, the estimate uses more bootstrapping, and introduces more bias. 
+interpolates between one-step TD and Monte Carlo. Smaller $n$ bootstraps sooner; larger $n$ uses more sampled rewards before bootstrapping.
 
-For large $n$, the estimate uses more sampled rewards, which leads to higher variance. 
+GAE provides the analogous interpolation for advantage estimation:
+
+$$
+\hat A_t^{\mathrm{GAE}(\gamma,\lambda)}
+=
+\sum_{l=0}^{\infty}
+(\gamma\lambda)^l
+\delta_{t+l}
+$$
+
+Smaller $\lambda$ places more weight on short-horizon TD residuals and therefore relies more strongly on the critic. Larger $\lambda$ incorporates rewards over a longer horizon and generally increases variance while reducing dependence on bootstrapping.
+
+When $V_\phi=V^\pi$, the one-step TD residual is already an unbiased advantage estimator conditional on $(S_t,A_t)$. When $V_\phi\neq V^\pi$, GAE remains an exact weighted sum of TD residuals, but it is only an approximate estimator of the true advantage.
 
 ---
