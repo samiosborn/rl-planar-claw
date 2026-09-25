@@ -35,7 +35,7 @@ FINGER_LATERAL_FRICTION = 0.3
 ROLLING_FRICTION = 0.0
 SPINNING_FRICTION = 0.0
 
-# Low restitution so contacts are not bouncy
+# Low restitution
 RESTITUTION = 0.0
 
 
@@ -58,7 +58,7 @@ RIGHT_JOINTS = (
 
 JOINTS = LEFT_JOINTS + RIGHT_JOINTS
 
-# Fingers hang down beside the cube with the outer joints curled in, so the fingertips start just clear of its sides
+# Initial joint positions
 INITIAL_JOINT_POSITIONS = {
     "left_joint_1": -0.55,
     "left_joint_2": 0.3,
@@ -77,14 +77,14 @@ MAX_JOINT_TORQUE = 2.0
 
 # --- Cube ---
 
-# Passive planar joints in mechanism order: prismatic y, prismatic z, continuous revolute x
+# Passive planar joints in order
 CUBE_JOINT_Y = "cube_slider_y"
 CUBE_JOINT_Z = "cube_slider_z"
 CUBE_JOINT_ANGLE = "cube_joint_x"
 CUBE_JOINTS = (CUBE_JOINT_Y, CUBE_JOINT_Z, CUBE_JOINT_ANGLE)
 
 # Cube box size
-CUBE_SIZE = (0.02, 0.08, 0.09)
+CUBE_SIZE = (0.02, 0.09, 0.09)
 
 # Initial cube pose, resting on the floor
 CUBE_INITIAL_Y = 0.0
@@ -101,7 +101,7 @@ TARGET_CUBE_ANGLE = math.pi / 4
 REWARD_QUADRATIC_WEIGHT = 0.5
 
 # Max steps in an episode
-MAX_EPISODE_STEPS = 300
+MAX_EPISODE_STEPS = 200
 
 
 # --- Observation space ---

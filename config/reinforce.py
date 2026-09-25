@@ -23,8 +23,8 @@ LEARNING_RATE = 1e-3
 # Number of training episodes
 NUM_TRAINING_EPISODES = 50000
 
-# Trajectories per policy-gradient update
-BATCH_SIZE = 20
+# Trajectories collected per rollout batch
+NUM_TRAJECTORIES = 20
 
 # Worker processes used to sample trajectories in parallel
 NUM_WORKERS = 8

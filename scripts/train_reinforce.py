@@ -6,11 +6,7 @@ import torch
 
 import config.reinforce as REINFORCE_CONFIG
 from src.algorithms.reinforce import PolicyNetwork, sample_action, train_batch
-from src.checkpoint import (
-    save_checkpoint,
-    should_print_progress,
-    should_save_checkpoint,
-)
+from src.checkpoint import save_reinforce_checkpoint, should_print_progress, should_save_checkpoint
 from src.parallel_rollout import init_worker
 
 
@@ -18,21 +14,12 @@ from src.parallel_rollout import init_worker
 policy = PolicyNetwork()
 
 # Initialise optimiser
-optimiser = torch.optim.Adam(
-    policy.parameters(),
-    lr=REINFORCE_CONFIG.LEARNING_RATE,
-)
+optimiser = torch.optim.Adam(policy.parameters(), lr=REINFORCE_CONFIG.LEARNING_RATE)
 
 # Create checkpoint directory
-REINFORCE_CONFIG.CHECKPOINT_DIR.mkdir(
-    parents=True,
-    exist_ok=True,
-)
+REINFORCE_CONFIG.CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 
-
-# Persistent worker pool for the whole training run
-# Each worker creates its own PyBullet environment and policy exactly once (see src/parallel_rollout.py)
-# No PyBullet connection is created in this process
+# Create parallel rollout workers
 pool = ProcessPoolExecutor(
     max_workers=REINFORCE_CONFIG.NUM_WORKERS,
     initializer=init_worker,
@@ -41,15 +28,14 @@ pool = ProcessPoolExecutor(
 
 try:
     # Initialise training progress
-    # completed_updates counts optimiser updates already performed
     episodes_completed = 0
     completed_updates = 0
 
-    # Train policy
+    # Train until target number of episodes is sampled
     while episodes_completed < REINFORCE_CONFIG.NUM_TRAINING_EPISODES:
-        # Save policy after exactly completed_updates optimiser updates (0 is the untrained policy)
+        # Save policy 
         if should_save_checkpoint(completed_updates, REINFORCE_CONFIG.CHECKPOINT_INTERVAL_UPDATES):
-            save_checkpoint(
+            save_reinforce_checkpoint(
                 policy,
                 optimiser,
                 completed_updates,
@@ -65,7 +51,7 @@ try:
 
         # Batch size, including possible smaller final batch
         batch_size = min(
-            REINFORCE_CONFIG.BATCH_SIZE,
+            REINFORCE_CONFIG.NUM_TRAJECTORIES,
             episodes_remaining,
         )
 
@@ -74,7 +60,6 @@ try:
         episode_end = episodes_completed + batch_size - 1
 
         # Train policy on a batch of trajectories sampled in parallel
-        # seed_start = episodes_completed guarantees every episode in the run gets a unique seed
         diagnostics = train_batch(
             pool,
             policy,
@@ -84,8 +69,7 @@ try:
             episodes_completed,
         )
 
-        # Print training diagnostics every PRINT_INTERVAL_UPDATES updates
-        # The batch was sampled from the policy after completed_updates updates, before the next one
+        # Print training diagnostics
         if should_print_progress(completed_updates, REINFORCE_CONFIG.PRINT_INTERVAL_UPDATES):
             print(
                 f"Update {completed_updates:4d} | "
@@ -102,7 +86,7 @@ try:
         completed_updates += 1
 
     # Save final policy after the last optimiser update
-    save_checkpoint(
+    save_reinforce_checkpoint(
         policy,
         optimiser,
         completed_updates,
