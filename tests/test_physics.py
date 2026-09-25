@@ -7,7 +7,7 @@ import numpy as np
 import pybullet as p
 import pytest
 
-import config.simulation as CONFIG
+import config.simulation as SIM_CONFIG
 from src.env import PlanarClawEnv
 
 # Link indices of each finger in the claw body (joint order in the URDF)
@@ -35,7 +35,7 @@ def env():
 def _claw_limits(env) -> dict[str, tuple[float, float]]:
     limits = {}
 
-    for joint_name in CONFIG.JOINTS:
+    for joint_name in SIM_CONFIG.JOINTS:
         joint_info = p.getJointInfo(env.claw_id, env.robot.joint_indices[joint_name])
         limits[joint_name] = (joint_info[8], joint_info[9])
 
@@ -80,18 +80,18 @@ def _step_toward(env, targets, tolerance=0.03):
 
 # The URDF must agree with the config on joint limits, velocity and torque
 def test_claw_urdf_matches_config():
-    joints = ET.parse(CONFIG.CLAW_URDF_PATH).getroot().findall("joint")
+    joints = ET.parse(SIM_CONFIG.CLAW_URDF_PATH).getroot().findall("joint")
 
-    assert len(joints) == len(CONFIG.JOINTS)
+    assert len(joints) == len(SIM_CONFIG.JOINTS)
 
     for joint in joints:
-        assert joint.get("name") in CONFIG.JOINTS
+        assert joint.get("name") in SIM_CONFIG.JOINTS
 
         limit = joint.find("limit")
         assert float(limit.get("lower")) == pytest.approx(-math.pi / 2, abs=1e-3)
         assert float(limit.get("upper")) == pytest.approx(math.pi / 2, abs=1e-3)
-        assert float(limit.get("velocity")) == CONFIG.MAX_JOINT_VELOCITY
-        assert float(limit.get("effort")) == CONFIG.MAX_JOINT_TORQUE
+        assert float(limit.get("velocity")) == SIM_CONFIG.MAX_JOINT_VELOCITY
+        assert float(limit.get("effort")) == SIM_CONFIG.MAX_JOINT_TORQUE
 
 
 # Action patterns that drive joints hard against their limits: all together, one at a time, and pinching both ways
@@ -103,7 +103,7 @@ def _hard_drive_patterns() -> dict[str, list[int]]:
         "open": [NEGATIVE] * 3 + [POSITIVE] * 3,
     }
 
-    for joint_index, joint_name in enumerate(CONFIG.JOINTS):
+    for joint_index, joint_name in enumerate(SIM_CONFIG.JOINTS):
         for direction_name, direction in (("negative", NEGATIVE), ("positive", POSITIVE)):
             actions = [HOLD] * 6
             actions[joint_index] = direction
@@ -133,7 +133,7 @@ def test_hard_drive_actually_reaches_the_limits(env):
         env.reset()
         _hold_actions(env, actions, num_steps=150, limits=limits)
 
-        for joint_index, (joint_name, action) in enumerate(zip(CONFIG.JOINTS, actions)):
+        for joint_index, (joint_name, action) in enumerate(zip(SIM_CONFIG.JOINTS, actions)):
             if action == HOLD:
                 continue
 
@@ -174,7 +174,7 @@ def test_initial_geometry_is_centred_symmetric_and_clear(env):
         assert (lower[0] + upper[0]) / 2 == pytest.approx(0.0, abs=1e-6)
 
     # Cube is centred at x = 0 and rests on the floor
-    cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
+    cube_link = env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE]
     cube_lower, cube_upper = p.getAABB(env.cube_id, cube_link)
     assert (cube_lower[0] + cube_upper[0]) / 2 == pytest.approx(0.0, abs=1e-6)
     assert cube_lower[2] == pytest.approx(0.0, abs=1e-3)
@@ -205,22 +205,22 @@ def test_initial_geometry_is_centred_symmetric_and_clear(env):
 def test_cube_geometry_matches_config_and_tips_more_easily(env):
     box_sizes = [
         tuple(float(v) for v in box.get("size").split())
-        for box in ET.parse(CONFIG.CUBE_URDF_PATH).getroot().iter("box")]
+        for box in ET.parse(SIM_CONFIG.CUBE_URDF_PATH).getroot().iter("box")]
 
     # Visual and collision boxes both use the configured size
-    assert box_sizes == [CONFIG.CUBE_SIZE] * 2
+    assert box_sizes == [SIM_CONFIG.CUBE_SIZE] * 2
 
     # Narrower footprint than height, so the tipping angle atan(width / height) is below 45 degrees, but not too tall to reach once toppled
-    assert CONFIG.CUBE_SIZE == (0.02, 0.08, 0.09)
-    _, width, height = CONFIG.CUBE_SIZE
+    assert SIM_CONFIG.CUBE_SIZE == (0.02, 0.08, 0.09)
+    _, width, height = SIM_CONFIG.CUBE_SIZE
     assert math.degrees(math.atan2(width, height)) == pytest.approx(41.63, abs=0.01)
     assert width == 0.08
 
     # Inertia matches a solid box of the collision size, with the same 0.1 kg mass
     mass = 0.1
-    assert p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[0] == pytest.approx(mass)
-    inertia = p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[2]
-    depth = CONFIG.CUBE_SIZE[0]
+    assert p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE])[0] == pytest.approx(mass)
+    inertia = p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE])[2]
+    depth = SIM_CONFIG.CUBE_SIZE[0]
     expected = (
         mass / 12 * (width ** 2 + height ** 2),
         mass / 12 * (depth ** 2 + height ** 2),
@@ -231,7 +231,7 @@ def test_cube_geometry_matches_config_and_tips_more_easily(env):
 # The cube rocks back just below its geometric tipping angle and topples just above it
 @pytest.mark.parametrize("side", [1, -1])
 def test_cube_tips_at_the_geometric_angle(env, side):
-    _, width, height = CONFIG.CUBE_SIZE
+    _, width, height = SIM_CONFIG.CUBE_SIZE
     tipping_angle = math.atan2(width, height)
     margin = math.radians(3)
 
@@ -273,12 +273,12 @@ def test_initial_pose_is_closer_to_contact_than_before(env):
 
 # The initial joint configuration is an exact left/right mirror and within limits
 def test_initial_joint_positions_are_symmetric_and_within_limits(env):
-    for left, right in zip(CONFIG.LEFT_JOINTS, CONFIG.RIGHT_JOINTS):
-        assert CONFIG.INITIAL_JOINT_POSITIONS[left] == -CONFIG.INITIAL_JOINT_POSITIONS[right]
+    for left, right in zip(SIM_CONFIG.LEFT_JOINTS, SIM_CONFIG.RIGHT_JOINTS):
+        assert SIM_CONFIG.INITIAL_JOINT_POSITIONS[left] == -SIM_CONFIG.INITIAL_JOINT_POSITIONS[right]
 
     limits = _claw_limits(env)
     for name, (lower, upper) in limits.items():
-        assert lower <= CONFIG.INITIAL_JOINT_POSITIONS[name] <= upper
+        assert lower <= SIM_CONFIG.INITIAL_JOINT_POSITIONS[name] <= upper
 
 
 # The reset pose is stable: nothing touches, the cube stays put and the claw does not drift
@@ -292,15 +292,15 @@ def test_reset_pose_is_stable_without_penetration(env):
         assert not p.getContactPoints(env.claw_id, env.claw_id)
 
     y, z, theta, *_ = env.cube.get_state()
-    assert y == pytest.approx(CONFIG.CUBE_INITIAL_Y, abs=1e-4)
-    assert z == pytest.approx(CONFIG.CUBE_INITIAL_Z, abs=1e-3)
+    assert y == pytest.approx(SIM_CONFIG.CUBE_INITIAL_Y, abs=1e-4)
+    assert z == pytest.approx(SIM_CONFIG.CUBE_INITIAL_Z, abs=1e-3)
     assert theta == pytest.approx(0.0, abs=1e-4)
     assert env.robot.get_joint_positions() == pytest.approx(initial_positions, abs=1e-2)
 
 
 # Fingertips start outside the cube and low enough to reach it
 def test_initial_pose_is_an_open_claw(env):
-    cube_half_width = CONFIG.CUBE_SIZE[1] / 2
+    cube_half_width = SIM_CONFIG.CUBE_SIZE[1] / 2
 
     left_tip_y = p.getLinkState(env.claw_id, 2)[0][1]
     right_tip_y = p.getLinkState(env.claw_id, 5)[0][1]
@@ -311,7 +311,7 @@ def test_initial_pose_is_an_open_claw(env):
 
     # Fingertips start just above the floor, level with the cube
     lowest_z = min(lower[2] for lower, _ in _link_aabbs(env.claw_id))
-    assert 0.0 < lowest_z < CONFIG.CUBE_SIZE[2]
+    assert 0.0 < lowest_z < SIM_CONFIG.CUBE_SIZE[2]
 
 
 # The claw can reach the cube from both sides without pushing through the floor
@@ -348,7 +348,7 @@ def test_fingertips_can_reach_the_floor(env):
     env.cube.reset(0.35, 0.3, 0.0)
 
     # Fingers hanging straight down are the longest reach
-    targets = np.zeros(len(CONFIG.JOINTS))
+    targets = np.zeros(len(SIM_CONFIG.JOINTS))
 
     for _ in range(90):
         _step_toward(env, targets, tolerance=0.01)
@@ -391,11 +391,11 @@ FALLEN_CUBE_CONTACT_POSE = (-0.65, 0.35, 1.0)
 # Cube lying on its side at 90 degrees, either way round, can be touched mid-height on the exposed side by each finger
 @pytest.mark.parametrize("angle", [math.pi / 2, -math.pi / 2])
 def test_fallen_cube_side_is_reachable_by_both_fingers(env, angle):
-    _, width, height = CONFIG.CUBE_SIZE
+    _, width, height = SIM_CONFIG.CUBE_SIZE
     env.cube.reset(0.0, width / 2, angle)
 
     # The fallen cube is 0.08 m tall and 0.09 m across
-    lower, upper = p.getAABB(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])
+    lower, upper = p.getAABB(env.cube_id, env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE])
     assert upper[2] == pytest.approx(width, abs=1e-3)
     assert upper[1] == pytest.approx(height / 2, abs=1e-3)
 
@@ -404,7 +404,7 @@ def test_fallen_cube_side_is_reachable_by_both_fingers(env, angle):
     goal = np.array(list(FALLEN_CUBE_CONTACT_POSE) + [-q for q in FALLEN_CUBE_CONTACT_POSE])
 
     for fraction in np.linspace(0.0, 1.0, 41):
-        for joint_name, position in zip(CONFIG.JOINTS, start + fraction * (goal - start)):
+        for joint_name, position in zip(SIM_CONFIG.JOINTS, start + fraction * (goal - start)):
             p.resetJointState(env.claw_id, env.robot.joint_indices[joint_name], position)
 
         p.performCollisionDetection()
@@ -466,8 +466,8 @@ def test_cube_rests_on_the_floor_and_stays_put(env):
     y, z, theta, vy, vz, omega = env.cube.get_state()
 
     # Neither hovering nor sinking
-    assert z == pytest.approx(CONFIG.CUBE_SIZE[2] / 2, abs=1e-3)
-    assert y == pytest.approx(CONFIG.CUBE_INITIAL_Y, abs=1e-4)
+    assert z == pytest.approx(SIM_CONFIG.CUBE_SIZE[2] / 2, abs=1e-3)
+    assert y == pytest.approx(SIM_CONFIG.CUBE_INITIAL_Y, abs=1e-4)
     assert theta == pytest.approx(0.0, abs=1e-4)
     assert max(abs(vy), abs(vz), abs(omega)) < 1e-3
 
@@ -477,11 +477,11 @@ def test_cube_rests_on_the_floor_and_stays_put(env):
 
 # Carriage links are virtual: they must not add meaningful mass to the cube
 def test_virtual_carriage_links_add_negligible_mass(env):
-    cube_mass = p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[0]
+    cube_mass = p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE])[0]
 
     assert cube_mass == pytest.approx(0.1)
 
-    for joint_name in (CONFIG.CUBE_JOINT_Y, CONFIG.CUBE_JOINT_Z):
+    for joint_name in (SIM_CONFIG.CUBE_JOINT_Y, SIM_CONFIG.CUBE_JOINT_Z):
         carriage_mass = p.getDynamicsInfo(env.cube_id, env.cube.joint_indices[joint_name])[0]
 
         assert 0.0 < carriage_mass <= 0.002 * cube_mass
@@ -489,9 +489,9 @@ def test_virtual_carriage_links_add_negligible_mass(env):
 
 # In free air the cube must respond as a 0.1 kg, I = 1.21e-4 kg m^2 rigid body would, so the carriage links do not distort its dynamics
 def test_cube_effective_mass_and_inertia(env):
-    cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
+    cube_link = env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE]
     duration_steps = 24
-    duration = duration_steps / CONFIG.PHYSICS_HZ
+    duration = duration_steps / SIM_CONFIG.PHYSICS_HZ
 
     # Place cube in free air
     def released_state():
@@ -502,7 +502,7 @@ def test_cube_effective_mass_and_inertia(env):
     released_state()
     for _ in range(duration_steps):
         p.stepSimulation()
-    assert env.cube.get_state()[4] == pytest.approx(-CONFIG.GRAVITY * duration, rel=0.01)
+    assert env.cube.get_state()[4] == pytest.approx(-SIM_CONFIG.GRAVITY * duration, rel=0.01)
 
     # Horizontal force: a = F / m along y
     released_state()
@@ -513,7 +513,7 @@ def test_cube_effective_mass_and_inertia(env):
 
     # Torque about x: alpha = tau / I, with no force coupling into the translational joints
     torque = 1e-3
-    inertia_x = 0.1 / 12 * (CONFIG.CUBE_SIZE[1] ** 2 + CONFIG.CUBE_SIZE[2] ** 2)
+    inertia_x = 0.1 / 12 * (SIM_CONFIG.CUBE_SIZE[1] ** 2 + SIM_CONFIG.CUBE_SIZE[2] ** 2)
 
     released_state()
     for _ in range(duration_steps):
@@ -531,7 +531,7 @@ def test_cube_effective_mass_and_inertia(env):
 # Sweep one finger into the cube via the real action space, recording what contact does to it
 # The cube's angle is never set after reset
 def _sweep_finger(env, finger_targets, side, num_steps=60):
-    targets = np.array([CONFIG.INITIAL_JOINT_POSITIONS[name] for name in CONFIG.JOINTS])
+    targets = np.array([SIM_CONFIG.INITIAL_JOINT_POSITIONS[name] for name in SIM_CONFIG.JOINTS])
     slice_ = slice(0, 3) if side == "left" else slice(3, 6)
     targets[slice_] = finger_targets
 
@@ -597,18 +597,18 @@ DEFAULT_LATERAL_FRICTION = 0.5
 
 # The live PyBullet dynamics must carry the configured friction on every collision link
 def test_contact_dynamics_are_applied_to_live_bodies(env):
-    cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
+    cube_link = env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE]
 
-    bodies = [(env.plane_id, -1, CONFIG.PLANE_LATERAL_FRICTION), (env.cube_id, cube_link, CONFIG.CUBE_LATERAL_FRICTION)]
-    bodies += [(env.claw_id, link, CONFIG.FINGER_LATERAL_FRICTION) for link in LEFT_LINKS + RIGHT_LINKS]
+    bodies = [(env.plane_id, -1, SIM_CONFIG.PLANE_LATERAL_FRICTION), (env.cube_id, cube_link, SIM_CONFIG.CUBE_LATERAL_FRICTION)]
+    bodies += [(env.claw_id, link, SIM_CONFIG.FINGER_LATERAL_FRICTION) for link in LEFT_LINKS + RIGHT_LINKS]
 
     for body_id, link_index, lateral_friction in bodies:
         info = p.getDynamicsInfo(body_id, link_index)
 
         assert info[1] == pytest.approx(lateral_friction)
-        assert info[5] == pytest.approx(CONFIG.RESTITUTION)
-        assert info[6] == pytest.approx(CONFIG.ROLLING_FRICTION)
-        assert info[7] == pytest.approx(CONFIG.SPINNING_FRICTION)
+        assert info[5] == pytest.approx(SIM_CONFIG.RESTITUTION)
+        assert info[6] == pytest.approx(SIM_CONFIG.ROLLING_FRICTION)
+        assert info[7] == pytest.approx(SIM_CONFIG.SPINNING_FRICTION)
 
     # The dynamics link is the real cube (0.1 kg), not the mount or a carriage
     assert p.getDynamicsInfo(env.cube_id, cube_link)[0] == pytest.approx(0.1)
@@ -622,14 +622,14 @@ def test_contact_dynamics_are_applied_to_live_bodies(env):
 def _push_upper_face(env, plane, cube, finger, approach=(-0.55, 0.3, 0.5), push=(-0.1, 1.5, 1.0)):
     env.reset()
 
-    cube_link = env.cube.joint_indices[CONFIG.CUBE_JOINT_ANGLE]
+    cube_link = env.cube.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE]
     p.changeDynamics(env.plane_id, -1, lateralFriction=plane)
     p.changeDynamics(env.cube_id, cube_link, lateralFriction=cube)
 
     for link in LEFT_LINKS + RIGHT_LINKS:
         p.changeDynamics(env.claw_id, link, lateralFriction=finger)
 
-    targets = np.array([CONFIG.INITIAL_JOINT_POSITIONS[name] for name in CONFIG.JOINTS])
+    targets = np.array([SIM_CONFIG.INITIAL_JOINT_POSITIONS[name] for name in SIM_CONFIG.JOINTS])
     contact_before_push = False
     contact = False
     thetas = []
@@ -669,7 +669,7 @@ def _push_in_fresh_env(*frictions):
 def test_configured_friction_tips_the_cube_instead_of_sliding_it():
     before = _push_in_fresh_env(*[DEFAULT_LATERAL_FRICTION] * 3)
     after = _push_in_fresh_env(
-        CONFIG.PLANE_LATERAL_FRICTION, CONFIG.CUBE_LATERAL_FRICTION, CONFIG.FINGER_LATERAL_FRICTION)
+        SIM_CONFIG.PLANE_LATERAL_FRICTION, SIM_CONFIG.CUBE_LATERAL_FRICTION, SIM_CONFIG.FINGER_LATERAL_FRICTION)
 
     for result in (before, after):
         assert result["contact"] and not result["contact_before_push"]
@@ -691,7 +691,7 @@ def test_configured_friction_tips_the_cube_instead_of_sliding_it():
 # Friction must not be so high that a finger glues to the cube: the pushed cube has to move
 def test_fingers_do_not_jam_the_cube(env):
     result = _push_upper_face(
-        env, CONFIG.PLANE_LATERAL_FRICTION, CONFIG.CUBE_LATERAL_FRICTION, CONFIG.FINGER_LATERAL_FRICTION)
+        env, SIM_CONFIG.PLANE_LATERAL_FRICTION, SIM_CONFIG.CUBE_LATERAL_FRICTION, SIM_CONFIG.FINGER_LATERAL_FRICTION)
 
     assert result["max_y"] > 0.02
     assert result["max_theta"] > math.radians(10)
@@ -712,10 +712,10 @@ def test_teleop_import_does_not_connect():
 # The camera must look along world -x so y runs left to right and z is vertical
 def test_teleop_camera_looks_along_x_with_z_up():
     view_matrix = np.array(p.computeViewMatrixFromYawPitchRoll(
-        CONFIG.CAMERA_TARGET_POSITION,
-        CONFIG.CAMERA_DISTANCE,
-        CONFIG.CAMERA_YAW,
-        CONFIG.CAMERA_PITCH,
+        SIM_CONFIG.CAMERA_TARGET_POSITION,
+        SIM_CONFIG.CAMERA_DISTANCE,
+        SIM_CONFIG.CAMERA_YAW,
+        SIM_CONFIG.CAMERA_PITCH,
         0,
         2)).reshape(4, 4, order="F")
 
@@ -736,10 +736,10 @@ def test_apply_camera_uses_configured_camera(monkeypatch):
     apply_camera()
 
     assert calls == [dict(
-        cameraDistance=CONFIG.CAMERA_DISTANCE,
-        cameraYaw=CONFIG.CAMERA_YAW,
-        cameraPitch=CONFIG.CAMERA_PITCH,
-        cameraTargetPosition=CONFIG.CAMERA_TARGET_POSITION)]
+        cameraDistance=SIM_CONFIG.CAMERA_DISTANCE,
+        cameraYaw=SIM_CONFIG.CAMERA_YAW,
+        cameraPitch=SIM_CONFIG.CAMERA_PITCH,
+        cameraTargetPosition=SIM_CONFIG.CAMERA_TARGET_POSITION)]
 
 
 # The teleop drives the same claw the environment (and so training) uses
@@ -747,11 +747,11 @@ def test_teleop_drives_all_six_joints_of_the_environments_claw(env):
     from scripts import teleop_claw
 
     # A mirrored open pose that touches neither the cube nor the other finger
-    targets = dict(zip(CONFIG.JOINTS, (-0.6, 0.4, -0.4, 0.6, -0.4, 0.4)))
+    targets = dict(zip(SIM_CONFIG.JOINTS, (-0.6, 0.4, -0.4, 0.6, -0.4, 0.4)))
     teleop_claw.drive_claw_to_positions(env, targets)
 
-    for _ in range(CONFIG.PHYSICS_HZ):
+    for _ in range(SIM_CONFIG.PHYSICS_HZ):
         p.stepSimulation()
 
-    for joint_name, position in zip(CONFIG.JOINTS, env.robot.get_joint_positions()):
+    for joint_name, position in zip(SIM_CONFIG.JOINTS, env.robot.get_joint_positions()):
         assert position == pytest.approx(targets[joint_name], abs=0.03)

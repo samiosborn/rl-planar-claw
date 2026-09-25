@@ -4,7 +4,7 @@ import math
 import numpy as np
 import pybullet as p
 
-import config.simulation as CONFIG
+import config.simulation as SIM_CONFIG
 from src.robot import PlanarClaw
 from src.cube import Cube
 from src.scene import load_scene, setup_physics
@@ -28,23 +28,23 @@ class PlanarClawEnv:
 
     # Validate actions
     def _validate_actions(self, actions) -> None:
-        if len(actions) != len(CONFIG.JOINTS):
-            raise ValueError(f"Expected {len(CONFIG.JOINTS)} actions, got {len(actions)}")
+        if len(actions) != len(SIM_CONFIG.JOINTS):
+            raise ValueError(f"Expected {len(SIM_CONFIG.JOINTS)} actions, got {len(actions)}")
 
         # Each action must be an integer index into the available actions
         for action in actions:
             if not isinstance(action, (int, np.integer)):
                 raise TypeError(f"Actions must be integer indices, got {type(action).__name__}")
 
-            if not 0 <= action < len(CONFIG.JOINT_ACTION_VELOCITIES):
-                raise ValueError(f"Action {action} must be between 0 and {len(CONFIG.JOINT_ACTION_VELOCITIES) - 1}")
+            if not 0 <= action < len(SIM_CONFIG.JOINT_ACTION_VELOCITIES):
+                raise ValueError(f"Action {action} must be between 0 and {len(SIM_CONFIG.JOINT_ACTION_VELOCITIES) - 1}")
 
 
     # Compute reward
     def _compute_reward(self, angle_error: float) -> float:
-        normalised_error = abs(angle_error) / CONFIG.TARGET_CUBE_ANGLE
+        normalised_error = abs(angle_error) / SIM_CONFIG.TARGET_CUBE_ANGLE
 
-        return -(normalised_error + CONFIG.REWARD_QUADRATIC_WEIGHT * normalised_error ** 2)
+        return -(normalised_error + SIM_CONFIG.REWARD_QUADRATIC_WEIGHT * normalised_error ** 2)
 
 
     # --- API ---
@@ -52,15 +52,15 @@ class PlanarClawEnv:
 
     # Signed error to the target, wrapped to [-pi, pi]
     def get_angle_error(self) -> float:
-        difference = CONFIG.TARGET_CUBE_ANGLE - self.cube.get_angle()
+        difference = SIM_CONFIG.TARGET_CUBE_ANGLE - self.cube.get_angle()
 
         return math.atan2(math.sin(difference), math.cos(difference))
 
 
     # Reset env
     def reset(self) -> np.ndarray:
-        self.robot.reset(CONFIG.INITIAL_JOINT_POSITIONS)
-        self.cube.reset(CONFIG.CUBE_INITIAL_Y, CONFIG.CUBE_INITIAL_Z, CONFIG.CUBE_INITIAL_ANGLE)
+        self.robot.reset(SIM_CONFIG.INITIAL_JOINT_POSITIONS)
+        self.cube.reset(SIM_CONFIG.CUBE_INITIAL_Y, SIM_CONFIG.CUBE_INITIAL_Z, SIM_CONFIG.CUBE_INITIAL_ANGLE)
 
         self.step_count = 0
 
@@ -95,11 +95,11 @@ class PlanarClawEnv:
     def step(self, actions) -> tuple[np.ndarray, float, bool]:
         self._validate_actions(actions)
 
-        target_velocities = [CONFIG.JOINT_ACTION_VELOCITIES[action] for action in actions]
+        target_velocities = [SIM_CONFIG.JOINT_ACTION_VELOCITIES[action] for action in actions]
         self.robot.set_joint_velocities(target_velocities)
 
         # Hold the velocity targets for the whole control step
-        for _ in range(CONFIG.PHYSICS_STEPS_PER_CONTROL):
+        for _ in range(SIM_CONFIG.PHYSICS_STEPS_PER_CONTROL):
             p.stepSimulation()
 
         self.step_count += 1
@@ -108,7 +108,7 @@ class PlanarClawEnv:
         angle_error = self.get_angle_error()
         reward = self._compute_reward(angle_error)
 
-        done = self.step_count >= CONFIG.MAX_EPISODE_STEPS
+        done = self.step_count >= SIM_CONFIG.MAX_EPISODE_STEPS
 
         return next_state, reward, done
 

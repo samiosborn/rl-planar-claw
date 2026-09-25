@@ -2,7 +2,7 @@
 
 import pybullet as p
 
-import config.simulation as CONFIG
+import config.simulation as SIM_CONFIG
 from src.scene import get_joint_indices
 
 
@@ -30,7 +30,7 @@ class PlanarClaw:
                 targetVelocity=0.0)
 
         # Stop joint motors 
-        self.set_joint_velocities([0.0] * len(CONFIG.JOINTS))
+        self.set_joint_velocities([0.0] * len(SIM_CONFIG.JOINTS))
 
 
     # Get joint positions (angle)
@@ -40,7 +40,7 @@ class PlanarClaw:
         return [p.getJointState(
             self.body_id, 
             self.joint_indices[joint_name])[0] 
-            for joint_name in CONFIG.JOINTS]
+            for joint_name in SIM_CONFIG.JOINTS]
 
 
     # Get joint velocities (angular velocity)
@@ -50,21 +50,21 @@ class PlanarClaw:
         return [p.getJointState(
             self.body_id, 
             self.joint_indices[joint_name])[1] 
-            for joint_name in CONFIG.JOINTS]
+            for joint_name in SIM_CONFIG.JOINTS]
 
 
     # Set joint velocities
     def set_joint_velocities(self, velocities: list[float]) -> None: 
         # Check dims
-        if len(velocities) != len(CONFIG.JOINTS):
-            raise ValueError(f"Expected {len(CONFIG.JOINTS)} velocities, got {len(velocities)}")
+        if len(velocities) != len(SIM_CONFIG.JOINTS):
+            raise ValueError(f"Expected {len(SIM_CONFIG.JOINTS)} velocities, got {len(velocities)}")
 
         # Loop over joints
-        for joint_name, velocity in zip(CONFIG.JOINTS, velocities): 
+        for joint_name, velocity in zip(SIM_CONFIG.JOINTS, velocities):
             joint_index = self.joint_indices[joint_name]
 
             # Clamp target velocity
-            velocity = max(-CONFIG.MAX_JOINT_VELOCITY, min(CONFIG.MAX_JOINT_VELOCITY, velocity))
+            velocity = max(-SIM_CONFIG.MAX_JOINT_VELOCITY, min(SIM_CONFIG.MAX_JOINT_VELOCITY, velocity))
 
             # Use velocity control
             p.setJointMotorControl2(
@@ -72,4 +72,4 @@ class PlanarClaw:
                 jointIndex=joint_index, 
                 controlMode=p.VELOCITY_CONTROL, 
                 targetVelocity=velocity,
-                force=CONFIG.MAX_JOINT_TORQUE)
+                force=SIM_CONFIG.MAX_JOINT_TORQUE)

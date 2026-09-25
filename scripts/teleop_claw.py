@@ -5,7 +5,7 @@ import time
 
 import pybullet as p
 
-import config.simulation as CONFIG
+import config.simulation as SIM_CONFIG
 from src.env import PlanarClawEnv
 from src.scene import apply_camera
 
@@ -21,8 +21,8 @@ def drive_claw_to_positions(env: PlanarClawEnv, targets: dict[str, float]) -> No
             jointIndex=env.robot.joint_indices[joint_name],
             controlMode=p.POSITION_CONTROL,
             targetPosition=target_position,
-            force=CONFIG.MAX_JOINT_TORQUE,
-            maxVelocity=CONFIG.MAX_JOINT_VELOCITY)
+            force=SIM_CONFIG.MAX_JOINT_TORQUE,
+            maxVelocity=SIM_CONFIG.MAX_JOINT_VELOCITY)
 
 
 def main() -> None:
@@ -32,14 +32,14 @@ def main() -> None:
 
     # One slider per joint, spanning its URDF limits
     sliders = {}
-    for joint_name in CONFIG.JOINTS:
+    for joint_name in SIM_CONFIG.JOINTS:
         joint_info = p.getJointInfo(env.claw_id, env.robot.joint_indices[joint_name])
 
         sliders[joint_name] = p.addUserDebugParameter(
             joint_name,
             rangeMin=joint_info[8],
             rangeMax=joint_info[9],
-            startValue=CONFIG.INITIAL_JOINT_POSITIONS[joint_name])
+            startValue=SIM_CONFIG.INITIAL_JOINT_POSITIONS[joint_name])
 
     # PyBullet buttons read as a counter that increases with each click
     reset_button = p.addUserDebugParameter("reset cube", 1, 0, 0)
@@ -56,7 +56,7 @@ def main() -> None:
             clicks = p.readUserDebugParameter(reset_button)
             if clicks != reset_clicks:
                 reset_clicks = clicks
-                env.cube.reset(CONFIG.CUBE_INITIAL_Y, CONFIG.CUBE_INITIAL_Z, CONFIG.CUBE_INITIAL_ANGLE)
+                env.cube.reset(SIM_CONFIG.CUBE_INITIAL_Y, SIM_CONFIG.CUBE_INITIAL_Z, SIM_CONFIG.CUBE_INITIAL_ANGLE)
 
             drive_claw_to_positions(
                 env,
@@ -68,7 +68,7 @@ def main() -> None:
                 last_print = time.time()
                 print(f"cube theta = {env.cube.get_angle():+.3f} rad | angle error to target = {env.get_angle_error():+.3f} rad")
 
-            time.sleep(1 / CONFIG.PHYSICS_HZ)
+            time.sleep(1 / SIM_CONFIG.PHYSICS_HZ)
 
     except (KeyboardInterrupt, p.error):
         # Ctrl+C, or the GUI window was closed

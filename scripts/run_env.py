@@ -2,7 +2,7 @@
 
 import random
 
-import config.simulation as CONFIG
+import config.simulation as SIM_CONFIG
 from src.env import PlanarClawEnv
 from src.scene import apply_camera
 
@@ -23,11 +23,11 @@ try:
     # Run one episode
     done = False
 
-    for _ in range(CONFIG.MAX_EPISODE_STEPS + 1):
+    for _ in range(SIM_CONFIG.MAX_EPISODE_STEPS + 1):
         # Random actions
         actions = [
-            random.randrange(len(CONFIG.JOINT_ACTION_VELOCITIES))
-            for _ in CONFIG.JOINTS
+            random.randrange(len(SIM_CONFIG.JOINT_ACTION_VELOCITIES))
+            for _ in SIM_CONFIG.JOINTS
         ]
 
         # Step environment

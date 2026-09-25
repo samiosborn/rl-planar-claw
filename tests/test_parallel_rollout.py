@@ -4,8 +4,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 import pytest
 
-import config.simulation as CONFIG
-from src.algorithms.reinforce import PolicyNetwork
+import config.simulation as SIM_CONFIG
+from src.algorithms.reinforce import PolicyNetwork, sample_action
 from src.parallel_rollout import _worker_identity, collect_trajectories_parallel, init_worker
 
 
@@ -35,11 +35,11 @@ def test_collect_trajectories_parallel_trajectory_lengths(pool):
     trajectories = collect_trajectories_parallel(pool, _snapshot(policy), batch_size, seed_start=10)
 
     for trajectory in trajectories:
-        assert trajectory["episode_length"] == CONFIG.MAX_EPISODE_STEPS
-        assert len(trajectory["states"]) == CONFIG.MAX_EPISODE_STEPS
-        assert len(trajectory["actions"]) == CONFIG.MAX_EPISODE_STEPS
-        assert len(trajectory["rewards"]) == CONFIG.MAX_EPISODE_STEPS
-        assert len(trajectory["log_probs"]) == CONFIG.MAX_EPISODE_STEPS
+        assert trajectory["episode_length"] == SIM_CONFIG.MAX_EPISODE_STEPS
+        assert len(trajectory["states"]) == SIM_CONFIG.MAX_EPISODE_STEPS
+        assert len(trajectory["actions"]) == SIM_CONFIG.MAX_EPISODE_STEPS
+        assert len(trajectory["rewards"]) == SIM_CONFIG.MAX_EPISODE_STEPS
+        assert len(trajectory["log_probs"]) == SIM_CONFIG.MAX_EPISODE_STEPS
         assert "final_state" in trajectory
 
 
@@ -51,7 +51,7 @@ def test_batch_smaller_than_worker_count(pool):
     trajectories = collect_trajectories_parallel(pool, _snapshot(policy), batch_size=2, seed_start=20)
 
     assert len(trajectories) == 2
-    assert all(trajectory["episode_length"] == CONFIG.MAX_EPISODE_STEPS for trajectory in trajectories)
+    assert all(trajectory["episode_length"] == SIM_CONFIG.MAX_EPISODE_STEPS for trajectory in trajectories)
 
 
 # Test that a final partial batch of size 1 still works
@@ -61,7 +61,7 @@ def test_final_partial_batch_of_one(pool):
     trajectories = collect_trajectories_parallel(pool, _snapshot(policy), batch_size=1, seed_start=30)
 
     assert len(trajectories) == 1
-    assert trajectories[0]["episode_length"] == CONFIG.MAX_EPISODE_STEPS
+    assert trajectories[0]["episode_length"] == SIM_CONFIG.MAX_EPISODE_STEPS
 
 
 # Leading steps compared in the seeding tests
@@ -76,8 +76,8 @@ def test_same_snapshot_and_seed_give_same_actions_in_fresh_workers():
     snapshot = _snapshot(policy)
 
     # Fresh single-worker pools share no process history
-    pool_a = ProcessPoolExecutor(max_workers=1, initializer=init_worker)
-    pool_b = ProcessPoolExecutor(max_workers=1, initializer=init_worker)
+    pool_a = ProcessPoolExecutor(max_workers=1, initializer=init_worker, initargs=(PolicyNetwork, sample_action))
+    pool_b = ProcessPoolExecutor(max_workers=1, initializer=init_worker, initargs=(PolicyNetwork, sample_action))
 
     try:
         trajectory_a = collect_trajectories_parallel(pool_a, snapshot, batch_size=1, seed_start=40)[0]
@@ -95,7 +95,7 @@ def test_same_snapshot_and_seed_give_same_actions_when_a_worker_is_reused():
     policy = PolicyNetwork()
     snapshot = _snapshot(policy)
 
-    single_worker_pool = ProcessPoolExecutor(max_workers=1, initializer=init_worker)
+    single_worker_pool = ProcessPoolExecutor(max_workers=1, initializer=init_worker, initargs=(PolicyNetwork, sample_action))
 
     try:
         first = collect_trajectories_parallel(single_worker_pool, snapshot, batch_size=1, seed_start=45)[0]

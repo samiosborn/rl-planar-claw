@@ -5,7 +5,6 @@ import os
 
 import torch
 
-from src.algorithms.reinforce import PolicyNetwork, sample_action
 from src.env import PlanarClawEnv
 from src.rollout import sample_episode
 
@@ -13,17 +12,24 @@ from src.rollout import sample_episode
 # Per-worker state, created exactly once per worker process by init_worker - a process can only host one PlanarClawEnv at a time
 _worker_env = None
 _worker_policy = None
+_worker_sample_action = None
 
 
 # Pool initialiser: create this worker's environment and policy once
-def init_worker():
-    global _worker_env, _worker_policy
+def init_worker(policy_factory, sample_action):
+    global _worker_env, _worker_policy, _worker_sample_action
 
     # Parallelism should come from separate worker processes (not from nested per-process PyTorch thread pools)
     torch.set_num_threads(1)
 
+    # Create worker environment
     _worker_env = PlanarClawEnv(gui=False)
-    _worker_policy = PolicyNetwork()
+
+    # Create worker policy
+    _worker_policy = policy_factory()
+
+    # Store action sampler
+    _worker_sample_action = sample_action
 
     # Close this worker's PyBullet connection
     atexit.register(_worker_env.close)
@@ -37,8 +43,8 @@ def _sample_episode_task(policy_state_dict: dict, seed: int) -> dict:
     # Every trajectory in a batch must be sampled from the exact same frozen snapshot
     _worker_policy.load_state_dict(policy_state_dict)
 
-    # Sample episode with the REINFORCE action sampler
-    return sample_episode(_worker_env, _worker_policy, sample_action)
+    # Sample episode with the injected action sampler
+    return sample_episode(_worker_env, _worker_policy, _worker_sample_action)
 
 
 # Return this worker's process id and environment identity

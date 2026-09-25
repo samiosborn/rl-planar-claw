@@ -4,8 +4,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 import torch
 
-import config.simulation as CONFIG
-from src.algorithms.reinforce import PolicyNetwork, train_batch
+import config.reinforce as REINFORCE_CONFIG
+from src.algorithms.reinforce import PolicyNetwork, sample_action, train_batch
 from src.checkpoint import (
     save_checkpoint,
     should_print_progress,
@@ -20,11 +20,11 @@ policy = PolicyNetwork()
 # Initialise optimiser
 optimiser = torch.optim.Adam(
     policy.parameters(),
-    lr=CONFIG.LEARNING_RATE,
+    lr=REINFORCE_CONFIG.LEARNING_RATE,
 )
 
 # Create checkpoint directory
-CONFIG.REINFORCE_CHECKPOINT_DIR.mkdir(
+REINFORCE_CONFIG.CHECKPOINT_DIR.mkdir(
     parents=True,
     exist_ok=True,
 )
@@ -34,8 +34,9 @@ CONFIG.REINFORCE_CHECKPOINT_DIR.mkdir(
 # Each worker creates its own PyBullet environment and policy exactly once (see src/parallel_rollout.py)
 # No PyBullet connection is created in this process
 pool = ProcessPoolExecutor(
-    max_workers=CONFIG.REINFORCE_NUM_WORKERS,
+    max_workers=REINFORCE_CONFIG.NUM_WORKERS,
     initializer=init_worker,
+    initargs=(PolicyNetwork, sample_action),
 )
 
 try:
@@ -45,25 +46,26 @@ try:
     completed_updates = 0
 
     # Train policy
-    while episodes_completed < CONFIG.NUM_TRAINING_EPISODES:
+    while episodes_completed < REINFORCE_CONFIG.NUM_TRAINING_EPISODES:
         # Save policy after exactly completed_updates optimiser updates (0 is the untrained policy)
-        if should_save_checkpoint(completed_updates):
+        if should_save_checkpoint(completed_updates, REINFORCE_CONFIG.CHECKPOINT_INTERVAL_UPDATES):
             save_checkpoint(
                 policy,
                 optimiser,
                 completed_updates,
                 episodes_completed,
+                REINFORCE_CONFIG.CHECKPOINT_DIR,
             )
 
         # Number of episodes remaining
         episodes_remaining = (
-            CONFIG.NUM_TRAINING_EPISODES
+            REINFORCE_CONFIG.NUM_TRAINING_EPISODES
             - episodes_completed
         )
 
         # Batch size, including possible smaller final batch
         batch_size = min(
-            CONFIG.REINFORCE_BATCH_SIZE,
+            REINFORCE_CONFIG.BATCH_SIZE,
             episodes_remaining,
         )
 
@@ -77,14 +79,14 @@ try:
             pool,
             policy,
             optimiser,
-            CONFIG.GAMMA,
+            REINFORCE_CONFIG.GAMMA,
             batch_size,
             episodes_completed,
         )
 
         # Print training diagnostics every PRINT_INTERVAL_UPDATES updates
         # The batch was sampled from the policy after completed_updates updates, before the next one
-        if should_print_progress(completed_updates):
+        if should_print_progress(completed_updates, REINFORCE_CONFIG.PRINT_INTERVAL_UPDATES):
             print(
                 f"Update {completed_updates:4d} | "
                 f"episodes {episode_start:4d}-{episode_end:<4d} | "
@@ -105,6 +107,7 @@ try:
         optimiser,
         completed_updates,
         episodes_completed,
+        REINFORCE_CONFIG.CHECKPOINT_DIR,
     )
 
 finally:

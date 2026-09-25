@@ -2,7 +2,7 @@
 
 import pybullet as p
 
-import config.simulation as CONFIG
+import config.simulation as SIM_CONFIG
 from src.scene import get_joint_indices
 
 
@@ -18,7 +18,7 @@ class Cube:
 
     # Keep the cube joints passive so gravity and contact drive them, not PyBullet's default velocity motor
     def _disable_motors(self) -> None:
-        for joint_name in CONFIG.CUBE_JOINTS:
+        for joint_name in SIM_CONFIG.CUBE_JOINTS:
             p.setJointMotorControl2(
                 bodyUniqueId=self.body_id,
                 jointIndex=self.joint_indices[joint_name],
@@ -30,21 +30,21 @@ class Cube:
 
     # Read the angle directly from the x joint to avoid Euler conversion
     def get_angle(self) -> float:
-        return p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[0]
+        return p.getJointState(self.body_id, self.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE])[0]
 
 
     # Returns y, z, theta, vy, vz, angular velocity about x
     def get_state(self) -> tuple[float, float, float, float, float, float]:
-        y, vy = p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_Y])[:2]
-        z, vz = p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_Z])[:2]
-        theta, omega = p.getJointState(self.body_id, self.joint_indices[CONFIG.CUBE_JOINT_ANGLE])[:2]
+        y, vy = p.getJointState(self.body_id, self.joint_indices[SIM_CONFIG.CUBE_JOINT_Y])[:2]
+        z, vz = p.getJointState(self.body_id, self.joint_indices[SIM_CONFIG.CUBE_JOINT_Z])[:2]
+        theta, omega = p.getJointState(self.body_id, self.joint_indices[SIM_CONFIG.CUBE_JOINT_ANGLE])[:2]
 
         return y, z, theta, vy, vz, omega
 
 
     # Reset to the given pose with zero velocity
     def reset(self, y: float, z: float, theta: float) -> None:
-        for joint_name, position in zip(CONFIG.CUBE_JOINTS, (y, z, theta)):
+        for joint_name, position in zip(SIM_CONFIG.CUBE_JOINTS, (y, z, theta)):
             p.resetJointState(
                 self.body_id,
                 self.joint_indices[joint_name],

@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-import config.simulation as CONFIG
+import config.reinforce as REINFORCE_CONFIG
+import config.simulation as SIM_CONFIG
 from src.algorithms.reinforce import PolicyNetwork, sample_action
 from src.env import PlanarClawEnv
 from src.rollout import rollout_episode
@@ -27,7 +28,7 @@ def checkpoint_update(path):
 
 
 # Discover checkpoints in update order
-def discover_checkpoints(directory=CONFIG.REINFORCE_CHECKPOINT_DIR):
+def discover_checkpoints(directory=REINFORCE_CONFIG.CHECKPOINT_DIR):
     paths = list(Path(directory).glob("*.pt"))
     valid_paths = [path for path in paths if UPDATE_PATTERN.search(path.name)]
     return sorted(valid_paths, key=lambda path: (checkpoint_update(path), path.name))
@@ -67,13 +68,13 @@ def parse_args():
     parser.add_argument(
         "--episodes",
         type=int,
-        default=CONFIG.NUM_ROLLOUT_EPISODES,
+        default=SIM_CONFIG.NUM_ROLLOUT_EPISODES,
         help="Trajectories sampled per checkpoint",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=CONFIG.PROJECT_ROOT / "trajectory_checkpoints.png",
+        default=SIM_CONFIG.PROJECT_ROOT / "trajectory_checkpoints.png",
         help="Saved figure path",
     )
     parser.add_argument("--show", action="store_true", help="Display the figure")
@@ -109,7 +110,7 @@ def sample_checkpoint_trajectories(checkpoint_paths, episodes, seed=None):
 
             # Sample trajectories
             trajectories = [
-                rollout_episode(env, policy, sample_action, CONFIG.GAMMA)
+                rollout_episode(env, policy, sample_action, REINFORCE_CONFIG.GAMMA)
                 for _ in range(episodes)
             ]
 

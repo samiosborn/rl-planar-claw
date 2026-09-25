@@ -12,8 +12,6 @@ PLANE_URDF_PATH = PROJECT_ROOT / "assets" / "plane.urdf"
 CLAW_URDF_PATH = PROJECT_ROOT / "assets" / "claw.urdf"
 CUBE_URDF_PATH = PROJECT_ROOT / "assets" / "cube.urdf"
 
-REINFORCE_CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints" / "reinforce"
-
 
 # --- Physics ---
 
@@ -105,8 +103,14 @@ REWARD_QUADRATIC_WEIGHT = 0.5
 # Max steps in an episode
 MAX_EPISODE_STEPS = 300
 
+
+# --- Observation space ---
+
 # 6 joint positions, 6 joint velocities, cube y, z, sin/cos(angle), vy, vz, angular velocity
 OBSERVATION_DIM = 19
+
+
+# --- Action space ---
 
 # Discrete velocity choices for each joint (rad/s)
 JOINT_ACTION_VELOCITIES = (
@@ -116,37 +120,10 @@ JOINT_ACTION_VELOCITIES = (
 )
 
 
-# --- REINFORCE ---
-
-# Discount factor
-GAMMA = 0.99
-
-# Learning rate
-LEARNING_RATE = 1e-3
-
-# Number of training episodes
-NUM_TRAINING_EPISODES = 50000
-
-# Trajectories per policy-gradient update
-REINFORCE_BATCH_SIZE = 20
-
-# Worker processes used to sample trajectories in parallel
-REINFORCE_NUM_WORKERS = 8
-
-# Save a checkpoint every N optimiser updates
-CHECKPOINT_INTERVAL_UPDATES = 200
-
-# Print training progress every N updates
-PRINT_INTERVAL_UPDATES = 200
-
-
 # --- Evaluation / visualisation ---
 
 # Trajectories sampled for the rollout plot
 NUM_ROLLOUT_EPISODES = 25
-
-# Episodes shown when watching a checkpoint
-REINFORCE_EVALUATION_EPISODES = 5
 
 # GUI Camera
 CAMERA_DISTANCE = 0.7

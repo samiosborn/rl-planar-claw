@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 
-import config.simulation as CONFIG
+import config.simulation as SIM_CONFIG
 
 
 class PolicyNetwork(nn.Module):
@@ -13,10 +13,10 @@ class PolicyNetwork(nn.Module):
         super().__init__()
 
         # Hidden layer
-        self.hidden = nn.Linear(CONFIG.OBSERVATION_DIM, 64)
+        self.hidden = nn.Linear(SIM_CONFIG.OBSERVATION_DIM, 64)
 
         # Output layer
-        self.output = nn.Linear(64, len(CONFIG.JOINTS) * len(CONFIG.JOINT_ACTION_VELOCITIES))
+        self.output = nn.Linear(64, len(SIM_CONFIG.JOINTS) * len(SIM_CONFIG.JOINT_ACTION_VELOCITIES))
 
 
     # Forward pass
@@ -30,8 +30,8 @@ class PolicyNetwork(nn.Module):
         # Reshape into one categorical distribution per joint
         logits = output.reshape(
             *state.shape[:-1],
-            len(CONFIG.JOINTS),
-            len(CONFIG.JOINT_ACTION_VELOCITIES),
+            len(SIM_CONFIG.JOINTS),
+            len(SIM_CONFIG.JOINT_ACTION_VELOCITIES),
         )
 
         return logits

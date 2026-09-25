@@ -5,7 +5,8 @@ import time
 
 import torch
 
-import config.simulation as CONFIG
+import config.reinforce as REINFORCE_CONFIG
+import config.simulation as SIM_CONFIG
 from src.algorithms.reinforce import PolicyNetwork, sample_action
 from src.env import PlanarClawEnv
 from src.scene import apply_camera
@@ -20,7 +21,7 @@ parser.add_argument(
 parser.add_argument(
     "--episodes",
     type=int,
-     default=CONFIG.REINFORCE_EVALUATION_EPISODES,
+     default=REINFORCE_CONFIG.EVALUATION_EPISODES,
     help="Number of episodes to watch",
 )
 args = parser.parse_args()
@@ -63,7 +64,7 @@ try:
             state, reward, done = env.step(action.tolist())
 
             # Run approximately in real time
-            time.sleep(1.0 / CONFIG.CONTROL_HZ)
+            time.sleep(1.0 / SIM_CONFIG.CONTROL_HZ)
 
 finally:
     env.close()

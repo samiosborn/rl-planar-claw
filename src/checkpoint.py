@@ -5,31 +5,29 @@ from datetime import datetime
 
 import torch
 
-import config.simulation as CONFIG
-
 
 # Whether to print at this update count
-def should_print_progress(completed_updates):
-    return completed_updates % CONFIG.PRINT_INTERVAL_UPDATES == 0
+def should_print_progress(completed_updates: int, interval: int) -> bool:
+    return completed_updates % interval == 0
 
 
 # Whether to checkpoint at this update count
-def should_save_checkpoint(completed_updates):
-    return completed_updates % CONFIG.CHECKPOINT_INTERVAL_UPDATES == 0
+def should_save_checkpoint(completed_updates: int, interval: int) -> bool:
+    return completed_updates % interval == 0
 
 
 # Build update-based checkpoint path
-def checkpoint_path(timestamp, completed_updates):
-    return CONFIG.REINFORCE_CHECKPOINT_DIR / f"{timestamp}_update_{completed_updates}.pt"
+def checkpoint_path(directory, timestamp, completed_updates: int):
+    return directory / f"{timestamp}_update_{completed_updates}.pt"
 
 
 # Save policy checkpoint
-def save_checkpoint(policy, optimiser, completed_updates, episodes_sampled):
+def save_checkpoint(policy, optimiser, completed_updates: int, episodes_sampled: int, directory):
     # Current date and time
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
     # Checkpoint path
-    path = checkpoint_path(timestamp, completed_updates)
+    path = checkpoint_path(directory, timestamp, completed_updates)
 
     # Save training state
     torch.save(
