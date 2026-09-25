@@ -115,12 +115,14 @@ def compute_trajectory_loss(policy: PolicyNetwork, trajectory: dict, gamma: floa
 
 # Run episode
 def run_episode(env, policy: PolicyNetwork, gamma: float):
-    # Local import avoids a circular import
+    # Import episode sampler
     from src.rollout import sample_episode
 
-    trajectory = sample_episode(env, policy)
+    # Sample trajectory and compute loss
+    trajectory = sample_episode(env, policy, sample_action)
     loss = compute_trajectory_loss(policy, trajectory, gamma)
 
+    # Return trajectory and loss
     return trajectory, loss
 
 

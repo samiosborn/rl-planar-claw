@@ -5,7 +5,7 @@ import os
 
 import torch
 
-from src.algorithms.reinforce import PolicyNetwork
+from src.algorithms.reinforce import PolicyNetwork, sample_action
 from src.env import PlanarClawEnv
 from src.rollout import sample_episode
 
@@ -37,7 +37,8 @@ def _sample_episode_task(policy_state_dict: dict, seed: int) -> dict:
     # Every trajectory in a batch must be sampled from the exact same frozen snapshot
     _worker_policy.load_state_dict(policy_state_dict)
 
-    return sample_episode(_worker_env, _worker_policy)
+    # Sample episode with the REINFORCE action sampler
+    return sample_episode(_worker_env, _worker_policy, sample_action)
 
 
 # Return this worker's process id and environment identity

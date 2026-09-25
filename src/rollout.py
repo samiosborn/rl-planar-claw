@@ -2,11 +2,9 @@
 
 import torch
 
-from src.algorithms.reinforce import sample_action
-
 
 # Sample one complete episode
-def sample_episode(env, policy):
+def sample_episode(env, policy, sample_action):
     # Reset environment
     state = env.reset()
 
@@ -14,6 +12,7 @@ def sample_episode(env, policy):
     states = []
     actions = []
     rewards = []
+    log_probs = []
 
     # Reset episode
     done = False
@@ -25,7 +24,7 @@ def sample_episode(env, policy):
             state_tensor = torch.tensor(state, dtype=torch.float32)
 
             # Sample action from policy
-            action, _ = sample_action(policy, state_tensor)
+            action, log_prob = sample_action(policy, state_tensor)
 
             # Convert action tensor to plain Python list
             action_list = action.tolist()
@@ -38,13 +37,19 @@ def sample_episode(env, policy):
             actions.append(action_list)
             rewards.append(reward)
 
+            # Store rollout-policy log-probability
+            log_probs.append(log_prob.item())
+
             # Update current state
             state = next_state
 
+    # Return trajectory data and final state
     return {
         "states": states,
         "actions": actions,
         "rewards": rewards,
+        "log_probs": log_probs,
+        "final_state": state,
         "episode_length": len(rewards),
     }
 

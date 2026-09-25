@@ -39,6 +39,8 @@ def test_collect_trajectories_parallel_trajectory_lengths(pool):
         assert len(trajectory["states"]) == CONFIG.MAX_EPISODE_STEPS
         assert len(trajectory["actions"]) == CONFIG.MAX_EPISODE_STEPS
         assert len(trajectory["rewards"]) == CONFIG.MAX_EPISODE_STEPS
+        assert len(trajectory["log_probs"]) == CONFIG.MAX_EPISODE_STEPS
+        assert "final_state" in trajectory
 
 
 # Test that a batch smaller than the pool's worker count still works
