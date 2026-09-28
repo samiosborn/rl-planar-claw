@@ -244,7 +244,7 @@ def test_optimise_epoch_updates_parameters():
         policy_optimiser,
         value_optimiser,
         batch,
-        clip_epsilon=0.2,
+        epsilon_clip=0.2,
     )
 
     assert any(

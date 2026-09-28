@@ -1,5 +1,6 @@
 # src/algorithms/ppo.py
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
@@ -239,7 +240,7 @@ def process_trajectory(
     gae_lambda: float,
 ) -> dict:
     # Convert to tensor
-    states = torch.tensor(trajectory["states"], dtype=torch.float32)
+    states = torch.tensor(np.array(trajectory["states"]), dtype=torch.float32)
     actions = torch.tensor(trajectory["actions"], dtype=torch.long)
     rewards = torch.tensor(trajectory["rewards"], dtype=torch.float32)
     final_state = torch.tensor(trajectory["final_state"], dtype=torch.float32)

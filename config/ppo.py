@@ -46,3 +46,8 @@ CHECKPOINT_INTERVAL_UPDATES = 200
 # Print training progress every N rollout updates
 PRINT_INTERVAL_UPDATES = 200
 
+
+# --- Evaluation ---
+
+# Episodes shown when watching a checkpoint
+EVALUATION_EPISODES = 5
